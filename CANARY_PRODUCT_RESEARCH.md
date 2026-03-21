@@ -31,6 +31,8 @@ Disaster response coordination fails at the information layer. When a hurricane,
 - **Communication between field responders and EOC coordinators is lossy** — critical details fall out in translation
 - **Social media is a goldmine of real-time ground truth that goes unmined** — citizens post photos, videos, and distress calls on X, Instagram, and TikTok faster than any official channel can report, yet no tool synthesizes this signal into operational intelligence
 - **Existing camera infrastructure sits idle during crises** — traffic cams, city surveillance networks, and RTSP feeds provide continuous visual ground truth, but incident commanders have no AI layer to watch them
+- **There is no public-facing contribution channel** — citizens witnessing disasters have no direct, structured way to submit reports to emergency systems; their social posts disappear into noise rather than reaching responders, insurers, or news outlets
+- **Consumers are blind to local hazards** — residents have no real-time, personalized alerting system tied to their zip code; they learn about nearby disasters through fragmented news or word-of-mouth, not structured AI-synthesized notifications
 
 The status quo tooling — WebEOC, ICS-based paper forms, and radio — was designed for a pre-AI world. The cognitive load on incident commanders during peak crisis is unsustainable, and mistakes cost lives.
 
@@ -91,6 +93,29 @@ The status quo tooling — WebEOC, ICS-based paper forms, and radio — was desi
 - Public information officers needing verified situational reports, including social media trend context
 - Smart city operations centers monitoring camera grids for emerging incidents
 
+### New Personas — Crowdsourcing & Consumer Alerting
+
+**Persona 4 — The Citizen Reporter**
+- **Who:** Any member of the public at or near a disaster scene
+- **Environment:** Smartphone, X (Twitter) app, on-site or adjacent to the event
+- **Pain:** No direct channel to officially report what they're seeing; posts get lost in social noise
+- **Need:** A simple, zero-friction way to contribute — just tweet at a handle with photos/video/text
+- **Tech comfort:** High social media fluency; zero willingness to install a dedicated app
+
+**Persona 5 — The Concerned Resident**
+- **Who:** Homeowner, renter, or business owner who wants to stay informed about their neighborhood
+- **Environment:** Mobile notifications, email, browser
+- **Pain:** Learns about nearby fires, floods, or gas leaks hours later from news or neighbors
+- **Need:** Proactive, AI-summarized alerts scoped to their zip code — not raw scanner traffic or vague county alerts
+- **Tech comfort:** Comfortable with notification subscriptions (weather apps, Nextdoor)
+
+**Persona 6 — The Intelligence Sink Operator**
+- **Who:** Insurance claims director, newsroom editor, utility operations manager, or municipal risk officer
+- **Environment:** Enterprise dashboard or API integration
+- **Pain:** Receives disaster information too slowly to act — claims surge without warning, breaking news is delayed, grid repair is reactive
+- **Need:** Structured, AI-vetted disaster intelligence piped directly into their systems as events unfold
+- **Tech comfort:** High; expects API or webhook delivery with structured JSON payloads
+
 ---
 
 ## 4. Core Value Propositions
@@ -115,6 +140,12 @@ When a declared disaster requires federal reporting, the system auto-drafts NIMS
 
 ### VP7: Works on a Firefighter's Phone
 No special hardware. No trained operators. A field responder opens a web app on their existing smartphone, taps record, takes photos, and is done. The intelligence lives in the cloud (Vercel + Gemini). Offline-first data capture queues for sync when connectivity returns.
+
+### VP8: X Bot — Crowdsourced Public Intelligence, Routed to the Right Desks
+The public becomes an active sensor network. Anyone can tweet at `@CanaryAlert` with photos, videos, or text describing what they're witnessing. The bot ingests every mention, passes the multimodal content to Gemini for structured analysis (location extraction, damage type, severity scoring, credibility assessment), and routes the resulting AI-generated report to registered downstream sinks — insurance companies, news organizations, utility operators, municipal risk desks, or any webhook endpoint. Sinks are configured and managed through the Canary web interface: each sink specifies what event types and severity levels it wants, what geographies it covers, and how it wants to receive the data (webhook, email digest, or API pull). The result: a single public tweet becomes a structured intelligence artifact delivered simultaneously to every stakeholder who needs to act on it.
+
+### VP9: Zip Code Subscriber Alerts — Neighborhood-Level Disaster Awareness
+Residents and consumers subscribe to real-time alerts for their zip code (or multiple zip codes). When Canary detects a verified incident — from field reports, the X bot, social signals, or camera feeds — in a subscribed area, it triggers a personalized notification: push notification, SMS, or email, containing an AI-drafted plain-language summary of the event, severity level, and recommended actions. No raw scanner feeds, no jargon — just *"Flooding detected on Oak Street, 3 blocks from your address. Avoid the area. Emergency services are responding."* Subscribers can set severity thresholds (Critical only vs. all events) and notification channels. This transforms Canary from a B2G tool into a B2C product with mass-market reach.
 
 ---
 
@@ -171,6 +202,32 @@ No special hardware. No trained operators. A field responder opens a web app on 
 - Downloadable as PDF or copy-pasteable markdown
 - *Demo moment:* Click button → full professional incident report (including social signal section and camera evidence) generated in 5 seconds
 
+**H. X Bot Crowdsourced Reporting + Sink Registry**
+- Twitter/X webhook or polling integration: monitor mentions of `@CanaryAlert` (or a configurable hashtag)
+- Each incoming tweet → route to Gemini multimodal analysis (text + any attached images/videos)
+- Gemini extracts: location, damage type, severity, credibility, recommended action
+- Structured AI report dispatched to all matching registered sinks via webhook `POST`
+- **Sink registry** (managed via `/sinks` in the web UI):
+  - Sink name, type (Webhook / Email Digest / API Pull), endpoint URL or email
+  - Filter configuration: event types (flood, fire, structural, etc.), minimum severity threshold, geographic coverage (zip codes or bounding box)
+  - Sink status badge: ACTIVE / PAUSED / ERROR (last delivery timestamp + HTTP status)
+  - "Test Delivery" button → sends a sample payload to verify endpoint
+- Sink types pre-seeded in UI: Insurance Claim System · Newsroom CMS · Utility Operations · Municipal Risk · Custom Webhook
+- *Demo moment:* Tweet a photo at the bot → within 10 seconds, a structured JSON report appears in the Sink Log panel and fires to a demo webhook endpoint (use [webhook.site](https://webhook.site) for live demo)
+- **MVP shortcut:** Use X API v2 filtered stream on a test account; or simulate with a timed fixture that mimics incoming tweets and triggers the pipeline manually
+
+**I. Zip Code Subscriber Alerts**
+- Consumer-facing subscription flow: enter zip code(s), choose notification channel (email for MVP; SMS/push for production), set severity threshold (All / High+ / Critical only)
+- When an incident is created or upgraded in a subscribed zip code, trigger notification pipeline
+- Notification content: AI-drafted plain-language summary (separate Gemini prompt: *"Write a 2-sentence consumer alert for someone living in this zip code"*), severity level, recommended action, incident ID link
+- **Subscription management UI** at `/subscribe` (public-facing, no auth required for MVP):
+  - Zip code input, email field, severity selector, notification channel selector
+  - Confirmation email with "Manage / Unsubscribe" link
+- **Admin view** at `/settings/subscriptions`: total subscriber count by zip, delivery stats, unsubscribe rate
+- Email delivery: Resend or SendGrid (both have generous free tiers)
+- *Demo moment:* Create an incident in zip 94102 → show that a subscriber email notification fires with an AI-plain-language summary; contrast with raw field report jargon
+- **MVP shortcut:** localStorage-backed subscriber list; use Resend free tier for actual email delivery; zip code matching via simple string comparison against incident location field
+
 ### Nice-to-Have (If Time Permits)
 - Audio playback of original voice notes linked to transcripts
 - Map integration (Mapbox free tier) with incident pins, social signal heat map, and camera location markers
@@ -223,10 +280,12 @@ Canary occupies **white space none of the above touches**: multimodal AI at the 
 - **State enterprise:** Aggregate county relationships + statewide camera network integration → **$180K–$450K/state/year**
 - **Channel:** NASPO and Sourcewell state procurement vehicles
 
-### Phase 3: Insurance, Infrastructure, and Smart City Verticals (Months 18–36)
-- **Target:** Parametric insurers (camera + social evidence for rapid claims), large utilities (PG&E, Duke Energy), smart city platform vendors
+### Phase 3: Insurance, Infrastructure, Smart City, and Consumer Verticals (Months 18–36)
+- **Target:** Parametric insurers (camera + social evidence for rapid claims), large utilities (PG&E, Duke Energy), smart city platform vendors, news organizations
 - **Model:** Per-event licensing or enterprise SaaS — **$50K–$500K/event or $250K–$1M ARR**
 - **Smart city angle:** Camera feed intelligence as a standalone module — sell to city IT departments running existing camera networks
+- **Sink marketplace:** Insurance companies, newsrooms, and utilities pay a per-delivery or monthly flat fee to receive AI-structured disaster intelligence routed from the X bot and field reports. Pricing: **$500–$5,000/month per sink** depending on volume and exclusivity window.
+- **Consumer subscriptions:** Freemium zip code alerts (free for 1 zip, Critical-only) → **$4.99/month** for multi-zip, all-severity, SMS + push. At scale (100K subscribers), this is a $6M ARR consumer revenue stream independent of government contracts.
 
 ### Positioning
 > *"Canary watches everything so your responders don't have to — turning field reports, citizen posts, and live camera feeds into structured decisions in seconds."*
@@ -271,11 +330,15 @@ Emergency responders operate under cognitive overload, physical stress, poor lig
 /cameras                   → Camera grid view + AI alert log
 /cameras/[id]              → Single camera feed + live AI monitoring panel
 /resources                 → Resource allocation panel
+/sinks                     → Registered intelligence sink management (add/edit/remove sinks)
+/sinks/new                 → Add new sink wizard
+/subscribe                 → Public-facing zip code alert subscription page
 /settings                  → User preferences, API config, camera/social source management
+/settings/subscriptions    → Admin view: subscriber analytics by zip code
 ```
 
 **Navigation model:**
-- **Desktop:** Persistent left sidebar (collapsible to icon-only) + status indicator at bottom. Sidebar sections: Incidents · Social · Cameras · Resources
+- **Desktop:** Persistent left sidebar (collapsible to icon-only) + status indicator at bottom. Sidebar sections: Incidents · Social · Cameras · Resources · Sinks · Subscribers
 - **Mobile:** Bottom tab bar with 5 tabs: Dashboard · New · Social · Cameras · Resources
 - **Breadcrumb:** Only on Incident Detail, Camera Detail, and Report pages. Max 3 levels.
 - **Back navigation:** Explicit back button on all non-root pages
@@ -434,6 +497,67 @@ Emergency responders operate under cognitive overload, physical stress, poor lig
 **AI content watermark:** Subtle "AI-assisted content" label at the top of each AI-generated section.
 
 **Sticky top action bar:** "Export PDF" (primary) · "Copy to Clipboard" · "Share Link" · "Back to Incident" text link.
+
+---
+
+#### Screen 9 — Sink Registry (Intelligence Distribution Management)
+
+**Layout:** Full-width. "Add Sink" primary button top-right. Tab strip: All Sinks · Active · Paused · Errored.
+
+**Sink cards (table row on desktop, `Card` on mobile):**
+- Sink name + type icon (webhook / email / API)
+- Status badge: ACTIVE (green) / PAUSED (amber) / ERROR (red, with last error message in tooltip)
+- Coverage summary: event types + minimum severity + geographic scope (zip codes or "National")
+- Last delivery: timestamp + HTTP response code
+- Delivery count (last 30 days)
+- Actions: "Edit" · "Test Delivery" · "Pause/Resume" · "Delete" (→ `AlertDialog` confirmation)
+
+**Delivery log panel (right side on desktop, tabbed on mobile):**
+- Recent delivery history: sink name · incident ID · event type · delivered at · HTTP status
+- Failed deliveries highlighted in red with "Retry" button
+
+**"Add Sink" wizard (multi-step `Dialog`):**
+1. **Step 1 — Sink Type:** Icon cards for Insurance · Newsroom · Utility · Municipal · Custom Webhook
+2. **Step 2 — Delivery Config:** Endpoint URL (webhook) or email address; authentication header (optional); payload format (JSON / Markdown summary)
+3. **Step 3 — Filters:** Event type checkboxes · Severity minimum `Select` · Geographic coverage (comma-separated zip codes or "All")
+4. **Step 4 — Review & Test:** Summary of config + "Send Test Payload" button → shows response inline
+
+---
+
+#### Screen 10 — Public Zip Code Subscription Page (`/subscribe`)
+
+**Layout:** Centered single-column, max-width 480px. Clean, consumer-grade UI — contrasts with the dark ops dashboard. Light mode default.
+
+**Hero:** Short headline — *"Get notified when disasters happen near you."* Subhead: *"AI-powered alerts for your neighborhood. Free for critical events."*
+
+**Subscription form:**
+- Zip code input (primary field, large)
+- "Add another zip code" link → adds a second `Input` (up to 5 zips)
+- Email field
+- Notification channel `RadioGroup`: Email · SMS (phone number input appears) · Both
+- Severity threshold `Select`: Critical Only (free) · High & Critical · All Events (premium badge)
+- "Subscribe Free" primary button
+
+**Confirmation state:** Success card — *"You're subscribed! Check your email to confirm."* + unsubscribe link
+
+**Below the fold:** Sample notification card (visual mockup of what alerts look like) + "How it works" 3-step explainer + privacy note.
+
+---
+
+#### Screen 11 — X Bot Sink Log (Internal Admin View)
+
+**Layout:** Two-column. Left (60%): incoming tweet feed. Right (40%): dispatch log.
+
+**Left — Incoming Tweet Feed:**
+- Chronological list of tweets sent to `@CanaryAlert`
+- Each card: @handle · tweet text · attached media thumbnail · timestamp
+- AI analysis status badge: PROCESSING → ANALYZED → DISPATCHED → FAILED
+- Extracted data chips: location · damage type · severity · credibility
+
+**Right — Dispatch Log:**
+- Per-tweet delivery record: tweet ID → Gemini analysis timestamp → sinks dispatched (list with HTTP status per sink)
+- "Re-dispatch" button for failed deliveries
+- Running stats: tweets processed today · sinks active · average dispatch latency
 
 ---
 
@@ -672,6 +796,13 @@ Camera panel tint:  #0A1410   (subtle teal — "this is camera data")
 | `/api/camera/frame` | `POST` | Analyze single camera keyframe; return anomaly detection result | `generateObject` |
 | `/api/incidents` | `GET` | Return stored incidents (localStorage shim for MVP) | None |
 | `/api/incidents` | `POST` | Persist completed incident record | None |
+| `/api/xbot/webhook` | `POST` | Receive X webhook CRC + mention events; trigger bot pipeline | None (X API) |
+| `/api/xbot/process` | `POST` | Analyze incoming tweet multimodal content; dispatch to matching sinks | `generateObject` |
+| `/api/sinks` | `GET/POST/PATCH/DELETE` | CRUD for registered intelligence sinks | None |
+| `/api/sinks/[id]/test` | `POST` | Fire a test payload to a sink endpoint | None |
+| `/api/subscribe` | `POST` | Create or update a zip code alert subscription | None |
+| `/api/subscribe/confirm` | `GET` | Email confirmation link handler | None |
+| `/api/notify/zipcode` | `POST` | Internal: triggered on incident creation; fan-out to matching subscribers | `generateText` (plain-language alert) |
 
 All AI routes export `runtime = 'nodejs'` and `maxDuration` to activate Fluid Compute.
 
@@ -750,6 +881,94 @@ export interface CameraAlert {
   linkedIncidentId: string | null;
 }
 
+// --- Intelligence Sink Types ---
+
+export type SinkType = 'WEBHOOK' | 'EMAIL_DIGEST' | 'API_PULL';
+export type SinkStatus = 'ACTIVE' | 'PAUSED' | 'ERROR';
+
+export interface IntelligenceSink {
+  id: string;
+  name: string;
+  category: 'INSURANCE' | 'NEWSROOM' | 'UTILITY' | 'MUNICIPAL' | 'CUSTOM';
+  type: SinkType;
+  endpointUrl?: string;       // for WEBHOOK type
+  emailAddress?: string;      // for EMAIL_DIGEST type
+  authHeader?: string;        // optional Bearer token for webhook auth
+  payloadFormat: 'JSON' | 'MARKDOWN';
+  filters: {
+    eventTypes: string[];     // e.g. ["flooding", "fire", "structural"]
+    minSeverity: SeverityLevel;
+    zipCodes: string[];        // empty = all geographies
+  };
+  status: SinkStatus;
+  lastDeliveredAt: string | null;
+  lastDeliveryStatusCode: number | null;
+  deliveryCount30d: number;
+  createdAt: string;
+}
+
+export interface SinkDelivery {
+  id: string;
+  sinkId: string;
+  incidentId: string;
+  sourceType: 'FIELD_REPORT' | 'X_BOT' | 'SOCIAL_SIGNAL' | 'CAMERA_ALERT';
+  deliveredAt: string;
+  httpStatusCode: number | null;
+  success: boolean;
+  errorMessage: string | null;
+  payloadSnapshot: string;   // JSON string of what was sent
+}
+
+// --- X Bot Types ---
+
+export interface XBotMention {
+  id: string;
+  tweetId: string;
+  authorHandle: string;
+  text: string;
+  mediaUrls: string[];
+  receivedAt: string;
+  processingStatus: 'PENDING' | 'ANALYZING' | 'DISPATCHED' | 'FAILED';
+  geminiAnalysis: {
+    extractedLocation: string | null;
+    damageType: string | null;
+    severityLevel: SeverityLevel;
+    credibility: CredibilityLevel;
+    summary: string;
+    aiTags: string[];
+  } | null;
+  sinksDispatched: string[];  // sink IDs
+  linkedIncidentId: string | null;
+}
+
+// --- Zip Code Subscriber Types ---
+
+export type NotificationChannel = 'EMAIL' | 'SMS' | 'BOTH';
+export type SeverityThreshold = 'CRITICAL_ONLY' | 'HIGH_AND_CRITICAL' | 'ALL';
+
+export interface ZipSubscriber {
+  id: string;
+  email: string;
+  phone?: string;
+  zipCodes: string[];
+  channel: NotificationChannel;
+  severityThreshold: SeverityThreshold;
+  confirmed: boolean;
+  confirmedAt: string | null;
+  createdAt: string;
+}
+
+export interface ZipAlertNotification {
+  id: string;
+  subscriberId: string;
+  incidentId: string;
+  zipCode: string;
+  channel: NotificationChannel;
+  sentAt: string;
+  delivered: boolean;
+  plainLanguageSummary: string;   // Gemini-generated consumer-friendly text
+}
+
 // --- Core Incident Types ---
 
 export interface IncidentReport {
@@ -782,6 +1001,90 @@ export interface Incident {
   linkedSocialSignalIds: string[];
   linkedCameraAlertIds: string[];
 }
+```
+
+---
+
+### X Bot + Sink Dispatch Pipeline
+
+```
+X Platform (Twitter API v2)
+    │  Account Activity API webhook
+    │  POST /api/xbot/webhook
+    ▼
+┌─────────────────────────────────────────────────────────┐
+│  /api/xbot/webhook (Node.js, Fluid Compute)             │
+│  1. Verify X webhook CRC challenge                      │
+│  2. Extract tweet: text + media URLs + author handle    │
+│  3. Enqueue to /api/xbot/process (async)                │
+└──────────────────────────┬──────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│  /api/xbot/process (Node.js, Fluid Compute)             │
+│  1. Fetch media from Twitter CDN                        │
+│  2. Build multimodal content parts (text + images)      │
+│  3. generateObject → Gemini 2.0 Flash                   │
+│     Output: location, damageType, severity,             │
+│             credibility, summary, aiTags                │
+│  4. Match against registered sinks (filter check)       │
+│  5. Fan-out: POST structured payload to each matching   │
+│     sink webhook endpoint (parallel fetch calls)        │
+│  6. Persist XBotMention + SinkDelivery records          │
+│  7. If severity HIGH+: auto-create linked Incident      │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Sink payload schema (JSON):**
+```json
+{
+  "source": "canary_xbot",
+  "tweetId": "1234567890",
+  "authorHandle": "@eyewitness_user",
+  "receivedAt": "2026-03-21T14:32:00Z",
+  "analysis": {
+    "location": "Oak Street & Highway 9, Sacramento, CA 95814",
+    "damageType": "Flooding",
+    "severityLevel": "HIGH",
+    "credibility": "MEDIUM",
+    "summary": "Witness reports active flooding at Oak/Hwy9. Water entering ground-floor businesses. Photo corroborates.",
+    "aiTags": ["flooding", "road-blocked", "property-damage"]
+  },
+  "linkedIncidentId": "inc_abc123",
+  "mediaUrls": ["https://pbs.twimg.com/..."]
+}
+```
+
+---
+
+### Zip Code Notification Pipeline
+
+```
+Incident created / severity upgraded
+    │
+    ▼
+POST /api/notify/zipcode
+    │  1. Extract zip code from incident location field
+    │  2. Query subscriber list: matching zip + severity threshold met
+    │  3. For each subscriber:
+    │     a. generateText → Gemini: plain-language 2-sentence consumer alert
+    │     b. Dispatch via Resend (email) or Twilio (SMS)
+    │  4. Persist ZipAlertNotification record per subscriber
+    ▼
+Subscriber receives:
+  Subject: "⚠ High severity flooding alert — Sacramento 95814"
+  Body:    "Flooding has been detected on Oak Street near Highway 9 in your
+            area. Emergency services are responding — avoid the area and
+            monitor official channels for updates. [View incident details]"
+```
+
+**Gemini prompt for consumer alert generation:**
+```
+You are writing a short emergency alert for a resident in zip code {zip}.
+An AI system has detected the following incident: {incidentSummary}
+Write a 2-sentence consumer-friendly alert. Use plain language. Do not use
+jargon. Include: what happened, where, and one recommended action.
+Do not include confidence scores or technical details.
 ```
 
 ---
@@ -1011,6 +1314,21 @@ NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
 # X_BEARER_TOKEN=...
 # REDDIT_CLIENT_ID=...
 # REDDIT_CLIENT_SECRET=...
+
+# X Bot (Account Activity API)
+# X_CONSUMER_KEY=...
+# X_CONSUMER_SECRET=...
+# X_ACCESS_TOKEN=...
+# X_ACCESS_TOKEN_SECRET=...
+# X_WEBHOOK_ENV=...   # X developer environment label
+
+# Email delivery (subscriber alerts)
+# RESEND_API_KEY=re_...
+
+# SMS delivery (optional for MVP)
+# TWILIO_ACCOUNT_SID=...
+# TWILIO_AUTH_TOKEN=...
+# TWILIO_FROM_NUMBER=+1...
 ```
 
 ---
@@ -1025,7 +1343,9 @@ NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
     "app/api/report/route.ts":         { "maxDuration": 120 },
     "app/api/transcribe/route.ts":     { "maxDuration": 60  },
     "app/api/social/analyze/route.ts": { "maxDuration": 60  },
-    "app/api/camera/frame/route.ts":   { "maxDuration": 60  }
+    "app/api/camera/frame/route.ts":   { "maxDuration": 60  },
+    "app/api/xbot/process/route.ts":   { "maxDuration": 120 },
+    "app/api/notify/zipcode/route.ts": { "maxDuration": 60  }
   }
 }
 ```
@@ -1059,6 +1379,10 @@ vercel --prod      # production
 | Multi-responder real-time sync | No WebSocket/DB needed | Pusher or Supabase Realtime |
 | Input validation / rate limiting | Internal tool demo at low volume | Zod + Upstash rate limiting |
 | Social credibility ML model | Gemini rule-based scoring is strong enough | Fine-tuned classifier |
+| Live X Account Activity API webhook | Use a fixture of 5 pre-written "tweets" replayed on a timer to simulate bot inbound | X API Account Activity API v2 |
+| Real sink delivery (webhook.site) | Pre-configure a public [webhook.site](https://webhook.site) URL as a demo sink; no actual insurance/news integration needed | Production sink API contracts |
+| Email subscriber alerts (Resend) | Pre-create one subscriber record in localStorage; trigger the Gemini plain-language alert generation live; print to console for demo | Resend + confirmed email delivery |
+| SMS via Twilio | Email only for MVP | Twilio programmable SMS |
 
 **Most impactful shortcut:** Pre-record a 2-minute disaster video clip and a 50-post social fixture. These two files alone make the camera and social features fully demonstrable with zero external API dependencies.
 
@@ -1090,15 +1414,19 @@ vercel --prod      # production
 
 > *"Field responder training required: 0 minutes."*
 
+> *"A single citizen tweet becomes a structured intelligence report delivered simultaneously to insurance adjusters, newsrooms, and utility operators — in under 10 seconds."*
+
+> *"Residents don't need to monitor a scanner. Canary watches their zip code and sends a plain-English alert the moment something is verified."*
+
 ### Judging Criteria Alignment
 
 | Typical Hackathon Criterion | How Canary Wins |
 |---|---|
 | **Technical Impressiveness** | Three simultaneous AI signal pipelines (field multimodal + social NLP + camera vision) streaming in real-time on Vercel Fluid Compute |
-| **Market Potential** | $32B emergency management + $3.8B social intelligence markets; explicit federal policy tailwind; climate change as structural driver |
-| **Social Impact** | Direct life-safety application — the camera + social layers can surface incidents before any official report is filed |
-| **Use of Sponsor Tech** | Deep Gemini 2.0 Flash multimodal + Vercel AI SDK 6 streaming + Vercel Blob = all sponsor criteria satisfied across three distinct use cases |
-| **Demo Quality** | Live end-to-end in 90 seconds; three wow moments (voice report, social batch analysis, camera alert auto-incident); no slides needed |
+| **Market Potential** | $32B emergency management + $3.8B social intelligence markets + consumer subscription revenue; explicit federal policy tailwind; climate change as structural driver |
+| **Social Impact** | Direct life-safety application — camera + social layers surface incidents before official reports; X bot turns bystanders into contributors; zip alerts protect residents who aren't monitoring scanners |
+| **Use of Sponsor Tech** | Deep Gemini 2.0 Flash multimodal + Vercel AI SDK 6 streaming + Vercel Blob = all sponsor criteria satisfied across five distinct use cases (field, social, camera, X bot, consumer alerts) |
+| **Demo Quality** | Live end-to-end in 90 seconds; five wow moments (voice report, social batch, camera alert, tweet → sink dispatch, zip subscriber alert); no slides needed |
 
 ### Post-Demo Validation Targets
 
@@ -1124,4 +1452,4 @@ vercel --prod      # production
 
 ---
 
-*Iterated from the original Disaster Recovery Product Research document · Product name updated to **Canary** · Social media signal intelligence and live camera feed AI added throughout · 2026-03-21*
+*Iterated from the original Disaster Recovery Product Research document · Product name updated to **Canary** · Social media signal intelligence and live camera feed AI added throughout · X bot crowdsourced reporting + intelligence sink registry + zip code consumer alerts added · 2026-03-21*
