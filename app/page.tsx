@@ -790,12 +790,30 @@ export default function Dashboard() {
 
                       {/* CTA buttons */}
                       <button
+                        onClick={() => {
+                          if (!incident) return;
+                          setChatOpen(true);
+                          setChatInput(
+                            `APPROVED: Execute the recommended action for incident "${incident.title}" (ID: ${incident.id}). ` +
+                            `Action: "${aiRec.actionSequence}". ` +
+                            `Update the incident status to responding, log the approval via pushActivity, and advance the response protocol.`
+                          );
+                        }}
                         className="w-full py-3.5 rounded-xl bg-tertiary-gradient text-white font-bold text-sm tracking-widest uppercase shadow-lg shadow-tertiary/20 hover:opacity-90 transition-all flex items-center justify-center gap-3 active:scale-95 duration-100"
                         aria-label="Approve resource dispatch"
                       >
                         {aiRec.ctaLabel ?? "Approve Dispatch"}
                       </button>
                       <button
+                        onClick={() => {
+                          // Clear recommendation locally and refresh
+                          fetch("/api/dashboard").then((r) => r.json()).then((d) => {
+                            setData({
+                              ...d,
+                              aiRecommendation: { actionSequence: "", confidenceScore: 0, stats: [], ctaLabel: "Approve Dispatch" },
+                            });
+                          });
+                        }}
                         className="w-full mt-3 py-2.5 rounded-xl bg-surface-container-highest text-on-surface-variant font-semibold text-xs tracking-widest uppercase hover:text-on-surface transition-colors"
                         aria-label="Dismiss recommendation and override manually"
                       >
