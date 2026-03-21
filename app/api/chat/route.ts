@@ -62,10 +62,10 @@ You can push updates to the live dashboard using these tools:
 - createIncident: Create a formal incident record. Use ONLY for genuinely new incidents.
 
 ## Photo Analysis
-When the user uploads images in the chat, you MUST call the analyzePhotos tool to run AI-powered damage assessment. The tool uses Gemini's multimodal capabilities to detect hazards, structural damage, and recommend actions. After analysis, summarize the findings for the user and push relevant updates to the dashboard.
+When the user uploads images in the chat, you MUST call the analyzePhotos tool to run AI-powered damage assessment. The images are automatically extracted from the message — you do NOT need to pass any image URLs. Just call analyzePhotos with optional context (title, description, location, incidentId). After analysis, summarize the findings and push relevant updates to the dashboard.
 
 ## CRITICAL RULES
-- When the user sends images: ALWAYS call analyzePhotos with the image URLs from the message. Describe what you see and the analysis results.
+- When the user sends images: ALWAYS call analyzePhotos immediately. Do NOT try to pass image data — it is extracted automatically.
 - When asked to TRIAGE an existing incident: use pushRecommendation and setResponseProtocol. Do NOT create a new incident or use pushSignal.
 - When asked to REPORT a new signal: use pushSignal (which creates an incident automatically).
 - When asked to GENERATE A REPORT: provide a detailed analysis as text and use pushRecommendation to summarize key findings.
@@ -76,6 +76,19 @@ Current dashboard state will be provided. Use it to inform your responses and av
 
 export async function POST(req: Request) {
   const { messages, modelTier }: { messages: UIMessage[]; modelTier?: ModelTier } = await req.json();
+
+  // Extract image data URLs from the latest user message for tool access
+  const latestUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+  const chatImageUrls: string[] = [];
+  if (latestUserMsg?.parts) {
+    for (const part of latestUserMsg.parts) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const p = part as any;
+      if (p.type === 'file' && p.mediaType?.startsWith('image/') && p.url) {
+        chatImageUrls.push(p.url);
+      }
+    }
+  }
 
   // Include current dashboard state as context
   const dashboardState = getDashboardData();
@@ -274,17 +287,19 @@ export async function POST(req: Request) {
 
       // Photo analysis tool — multimodal AI damage assessment
       analyzePhotos: tool({
-        description: 'Analyze incident photos using multimodal AI (Nano Banana 2). Call this when the user uploads images in chat. Detects damage, hazards, structural issues, and recommends actions. Can link to an existing incident or create a new one.',
+        description: 'Analyze incident photos uploaded by the user in this chat message. The images are automatically extracted — you do NOT need to pass image URLs. Just call this tool when the user uploads photos.',
         inputSchema: z.object({
-          imageUrls: z.array(z.string()).describe('Data URLs of images from the chat message (e.g. data:image/jpeg;base64,...)'),
           incidentId: z.string().uuid().optional().describe('Existing incident ID to link photos to'),
           title: z.string().optional().describe('Title for a new incident (required if no incidentId)'),
           description: z.string().optional().describe('Additional context about the photos'),
           location: z.string().optional().describe('Location context if known'),
         }),
-        execute: async ({ imageUrls, incidentId, title, description, location }) => {
+        execute: async ({ incidentId, title, description, location }) => {
           try {
-            const imageParts = imageUrls.map((url) => ({ type: 'image' as const, image: url }));
+            if (chatImageUrls.length === 0) {
+              return { success: false, error: 'No images found in the current message. Please upload photos first.' };
+            }
+            const imageParts = chatImageUrls.map((url) => ({ type: 'image' as const, image: url }));
 
             const promptText = [
               'Analyze the following incident photo(s) for emergency response purposes.',
@@ -364,7 +379,7 @@ export async function POST(req: Request) {
               incidentId: resultIncidentId,
             });
 
-            addActivity('Photo Analyzer', `Analyzed ${imageUrls.length} photo(s) via chat — severity ${finalSeverity}`);
+            addActivity('Photo Analyzer', `Analyzed ${chatImageUrls.length} photo(s) via chat — severity ${finalSeverity}`);
 
             return {
               success: true,
