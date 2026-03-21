@@ -436,6 +436,10 @@ export type Runbook = z.infer<typeof RunbookSchema>;
 // X Bot / Webhook Integration Schemas
 // ---------------------------------------------------------------------------
 
+/**
+ * XMention — In-memory type used by the xbot-handler and polling route.
+ * Maps to the `xbot_mentions` table in Supabase.
+ */
 export const XMentionSchema = z.object({
   id: z.string(),
   authorId: z.string(),

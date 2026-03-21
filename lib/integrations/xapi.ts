@@ -121,7 +121,7 @@ export async function fetchMentions(
     const response = await client.v2.userMentionTimeline(userId, params);
 
     return {
-      data: response.data.data || [],
+      data: (response.data.data || []) as unknown as XMentionRaw[],
       includes: response.includes as XMentionsResponse['includes'],
       meta: {
         result_count: response.data.data?.length || 0,

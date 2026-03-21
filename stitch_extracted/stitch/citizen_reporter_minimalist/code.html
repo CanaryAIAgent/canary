@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Citizen Reporter | INC-882</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-error": "#490106",
+              "error-container": "#7f2927",
+              "on-secondary-fixed-variant": "#5c5b5b",
+              "on-tertiary-fixed-variant": "#f8f8ff",
+              "error": "#ee7d77",
+              "on-primary-container": "#d0d0d0",
+              "secondary-fixed": "#e4e2e1",
+              "surface": "#0e0e0e",
+              "on-surface-variant": "#acabaa",
+              "tertiary-fixed-dim": "#006ee6",
+              "primary-fixed": "#e2e2e2",
+              "on-error-container": "#ff9993",
+              "background": "#0e0e0e",
+              "surface-container-lowest": "#000000",
+              "on-secondary": "#202020",
+              "secondary": "#9f9d9d",
+              "on-secondary-container": "#c1bfbe",
+              "secondary-fixed-dim": "#d6d4d3",
+              "primary-dim": "#b8b9b9",
+              "inverse-surface": "#fcf8f8",
+              "primary": "#c6c6c7",
+              "on-tertiary-container": "#000000",
+              "inverse-primary": "#5e5f60",
+              "on-background": "#e7e5e4",
+              "on-secondary-fixed": "#3f3f3f",
+              "on-primary-fixed-variant": "#5a5c5c",
+              "surface-variant": "#252626",
+              "secondary-container": "#3b3b3b",
+              "surface-container-low": "#131313",
+              "tertiary-dim": "#0070eb",
+              "on-primary-fixed": "#3e4040",
+              "error-dim": "#bb5551",
+              "surface-bright": "#2c2c2c",
+              "tertiary-container": "#007aff",
+              "on-primary": "#3f4041",
+              "inverse-on-surface": "#565554",
+              "on-tertiary-fixed": "#ffffff",
+              "primary-fixed-dim": "#d4d4d4",
+              "surface-tint": "#c6c6c7",
+              "tertiary-fixed": "#007aff",
+              "on-surface": "#e7e5e4",
+              "secondary-dim": "#9f9d9d",
+              "surface-container-highest": "#252626",
+              "surface-dim": "#0e0e0e",
+              "outline": "#767575",
+              "tertiary": "#679cff",
+              "on-tertiary": "#001f4a",
+              "surface-container": "#191a1a",
+              "surface-container-high": "#1f2020",
+              "outline-variant": "#484848",
+              "primary-container": "#454747"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0e0e0e;
+        }
+        .ghost-border {
+            border: 1px solid rgba(72, 72, 72, 0.15);
+        }
+        .primary-gradient {
+            background: linear-gradient(145deg, #679cff 0%, #0070eb 100%);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="text-on-surface flex flex-col min-h-screen">
+<!-- TopAppBar -->
+<header class="bg-[#0e0e0e] border-b border-[#484848]/15 flex items-center justify-between w-full px-6 h-14 fixed top-0 z-50">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#679cff]" data-icon="sensors">sensors</span>
+<span class="font-['Inter'] font-semibold text-sm tracking-wider uppercase text-[#e7e5e4]">Canary | INC-882</span>
+</div>
+<div class="flex items-center">
+<span class="text-[#e7e5e4] font-bold text-base tracking-tighter">OPERATOR PORTAL</span>
+</div>
+</header>
+<main class="flex-grow flex items-center justify-center px-6 py-20">
+<!-- Submission Canvas -->
+<div class="w-full max-w-xl flex flex-col gap-10">
+<!-- Prompt Section -->
+<div class="text-center">
+<h1 class="text-[2.75rem] font-bold leading-tight tracking-tight text-on-surface">Report an Emergency</h1>
+<p class="text-on-surface-variant mt-3 text-body-md">Provide critical details for immediate system dispatch.</p>
+</div>
+<!-- Main Input Form -->
+<div class="flex flex-col gap-6">
+<!-- Text Area -->
+<div class="group">
+<div class="bg-surface-container-lowest ghost-border rounded-xl p-4 transition-all focus-within:border-tertiary/100">
+<textarea class="w-full bg-transparent border-none focus:ring-0 text-on-surface placeholder:text-on-surface-variant/50 resize-none min-h-[160px] text-body-md" placeholder="Describe the situation in detail..."></textarea>
+</div>
+</div>
+<!-- Media & Location Buttons -->
+<div class="grid grid-cols-2 gap-4">
+<button class="flex items-center justify-center gap-2 bg-secondary-container text-on-secondary-container py-3.5 rounded-lg font-medium text-sm hover:bg-surface-bright/50 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="attachment">attachment</span>
+                        Attach Media
+                    </button>
+<button class="flex items-center justify-center gap-2 bg-secondary-container text-on-secondary-container py-3.5 rounded-lg font-medium text-sm hover:bg-surface-bright/50 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="location_on">location_on</span>
+                        Auto-detect Location
+                    </button>
+</div>
+<!-- AI Validation Status -->
+<div class="bg-surface-container-low rounded-lg p-4 flex flex-col gap-3">
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary text-sm" data-icon="auto_awesome">auto_awesome</span>
+<span class="text-[0.6875rem] font-semibold uppercase tracking-[0.2rem] text-tertiary">AI Validation Engine</span>
+</div>
+<span class="text-[0.6875rem] font-semibold uppercase tracking-[0.1rem] text-on-surface-variant">78% Verified</span>
+</div>
+<!-- Status Bar -->
+<div class="h-1 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-tertiary w-[78%] rounded-full"></div>
+</div>
+<p class="text-[10px] text-on-surface-variant/70 italic leading-relaxed">Analyzing semantic relevance and cross-referencing metadata with local dispatch logs...</p>
+</div>
+<!-- Action Button -->
+<button class="primary-gradient text-on-tertiary-fixed py-4 rounded-xl font-bold text-base shadow-lg shadow-tertiary/10 active:scale-95 transition-transform">
+                    Broadcast Report
+                </button>
+</div>
+<!-- Secondary Information -->
+<div class="flex justify-center items-center gap-6">
+<div class="flex items-center gap-2 text-on-surface-variant/60">
+<span class="material-symbols-outlined text-xs" data-icon="verified_user">verified_user</span>
+<span class="text-[10px] font-medium uppercase tracking-widest">End-to-End Encrypted</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant/60">
+<span class="material-symbols-outlined text-xs" data-icon="speed">speed</span>
+<span class="text-[10px] font-medium uppercase tracking-widest">Priority Queue</span>
+</div>
+</div>
+</div>
+</main>
+<!-- Navigation Drawer (Side) - Suppressed per focus rules but included for structural reference if needed -->
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center h-16 pb-safe bg-[#0e0e0e]/80 backdrop-blur-xl border-t border-[#484848]/15 z-50">
+<a class="flex flex-col items-center justify-center text-[#484848] hover:text-[#e7e5e4] transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#679cff] scale-110 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="activity" style="font-variation-settings: 'FILL' 1;">search_activity</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#484848] hover:text-[#e7e5e4] transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="explore">explore</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#484848] hover:text-[#e7e5e4] transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="shield">shield</span>
+</a>
+</nav>
+</body></html>

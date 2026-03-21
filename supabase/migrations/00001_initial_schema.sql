@@ -431,25 +431,25 @@ CREATE INDEX idx_compliance_controls_status    ON compliance_controls (status);
 -- INTEGRATIONS: X Mentions & Inbound Webhooks
 -- ============================================================================
 
-CREATE TABLE x_mentions (
-  id                  TEXT PRIMARY KEY,
-  author_id           TEXT NOT NULL,
-  author_handle       TEXT NOT NULL,
-  text                TEXT NOT NULL,
-  media_keys          TEXT[] NOT NULL DEFAULT '{}',
-  media_urls          TEXT[] NOT NULL DEFAULT '{}',
-  conversation_id     TEXT,
-  in_reply_to_user_id TEXT,
-  lang                TEXT,
-  -- Geo (JSONB for nested optional structure)
-  geo                 JSONB,
-  -- Timestamps
-  created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+CREATE TABLE xbot_mentions (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tweet_id        TEXT NOT NULL UNIQUE,
+  author_id       TEXT NOT NULL,
+  author_handle   TEXT NOT NULL,
+  tweet_text      TEXT NOT NULL,
+  media_urls      TEXT[] DEFAULT '{}',
+  has_media       BOOLEAN DEFAULT FALSE,
+  has_location    BOOLEAN DEFAULT FALSE,
+  confidence      TEXT CHECK (confidence IN ('confirmed', 'potential')),
+  ai_response     TEXT,
+  incident_id     UUID,
+  processed_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_x_mentions_author    ON x_mentions (author_handle);
-CREATE INDEX idx_x_mentions_created   ON x_mentions (created_at);
-CREATE INDEX idx_x_mentions_geo       ON x_mentions USING GIN (geo);
+CREATE INDEX idx_xbot_mentions_processed_at ON xbot_mentions (processed_at DESC);
+CREATE INDEX idx_xbot_mentions_confidence   ON xbot_mentions (confidence);
+CREATE INDEX idx_xbot_mentions_tweet_id     ON xbot_mentions (tweet_id);
 
 
 CREATE TABLE integration_webhooks (
@@ -485,7 +485,7 @@ BEGIN
     SELECT unnest(ARRAY[
       'incidents', 'social_signals', 'camera_feeds', 'camera_alerts',
       'sinks', 'subscribers', 'agent_logs', 'runbooks', 'runbook_steps',
-      'compliance_reports', 'compliance_controls', 'x_mentions',
+      'compliance_reports', 'compliance_controls', 'xbot_mentions',
       'integration_webhooks'
     ])
   LOOP
