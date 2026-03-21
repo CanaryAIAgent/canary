@@ -11,12 +11,12 @@
  */
 
 import { generateText, stepCountIs } from 'ai';
-import { google } from '@ai-sdk/google';
 import { tool } from 'ai';
+import { getFlashModel } from '@/lib/ai/config';
 import { z } from 'zod';
 import { ORCHESTRATOR_PROMPT } from './prompts';
 import {
-  fetchMetricsTool,
+  checkShelterCapacityTool,
   createIncidentTool,
   updateIncidentStatusTool,
   fetchRunbookTool,
@@ -164,7 +164,7 @@ const classifyAlertTool = tool({
   inputSchema: z.object({
     alertText: z.string().describe('Raw alert text or summary'),
     source: z.enum(['field', 'social', 'camera', 'integration', 'xbot']),
-    rawPayload: z.record(z.unknown()).optional(),
+    rawPayload: z.record(z.string(), z.unknown()).optional(),
   }),
   execute: async ({ alertText, source }) => {
     // In production: run a fast generateObject call to classify this alert
@@ -239,7 +239,7 @@ export async function runOrchestratorAgent(
   const prompt = contextParts.join('\n');
 
   const { text, steps, finishReason, usage } = await generateText({
-    model: google('gemini-2.0-flash'),
+    model: getFlashModel(),
     system: ORCHESTRATOR_PROMPT,
     prompt,
     tools: {
@@ -248,7 +248,7 @@ export async function runOrchestratorAgent(
       routeToRecovery: routeToRecoveryTool,
       routeToCompliance: routeToComplianceTool,
       routeToRunbook: routeToRunbookTool,
-      fetchMetrics: fetchMetricsTool,
+      checkShelterCapacity: checkShelterCapacityTool,
       createIncident: createIncidentTool,
       updateIncidentStatus: updateIncidentStatusTool,
       fetchRunbook: fetchRunbookTool,
@@ -262,8 +262,8 @@ export async function runOrchestratorAgent(
       console.log('[orchestrator] completed', {
         sessionId,
         steps: steps.length,
-        inputTokens: usage.promptTokens,
-        outputTokens: usage.completionTokens,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
       });
     },
   });
@@ -284,8 +284,9 @@ export async function runOrchestratorAgent(
       if (toolCall.toolName === 'createIncident') {
         // Extract created incident ID from tool result
         const result = step.toolResults?.find((r) => r.toolCallId === toolCall.toolCallId);
-        if (result?.result && typeof result.result === 'object' && 'incidentId' in result.result) {
-          resolvedIncidentId = result.result.incidentId as string;
+        const output = result && 'output' in result ? result.output : undefined;
+        if (output && typeof output === 'object' && 'incidentId' in output) {
+          resolvedIncidentId = (output as { incidentId: string }).incidentId;
         }
       }
     }

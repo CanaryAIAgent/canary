@@ -1,29 +1,29 @@
 /**
  * Canary — Triage Agent
  *
- * Specialist agent for root cause analysis, blast radius assessment,
- * and RTO/RPO estimation. Invoked by the Orchestrator for any incident
- * with severity >= 3.
+ * Specialist agent for physical damage assessment, life-safety risk analysis,
+ * affected population estimation, and emergency resource prioritization.
+ * Applies FEMA ATC-45 rapid assessment and ICS priority classification.
+ * Invoked by the Orchestrator for any incident with severity >= 3.
  *
  * Model: gemini-2.0-flash for speed-critical triage (< 30s target)
- *        gemini-2.5-pro for complex multi-system infrastructure analysis
+ *        gemini-2.5-pro for complex multi-jurisdictional incident analysis
  * Max steps: 15
  * Route: POST /api/agents/triage
  */
 
 import { generateText, generateObject, stepCountIs } from 'ai';
-import { google } from '@ai-sdk/google';
 import { tool } from 'ai';
+import { getFlashModel, getProModel } from '@/lib/ai/config';
 import { z } from 'zod';
 import { TRIAGE_PROMPT } from './prompts';
 import {
-  fetchMetricsTool,
+  checkShelterCapacityTool,
   updateIncidentStatusTool,
   fetchRunbookTool,
   logAgentActionTool,
   notifyHumanTool,
   searchSimilarIncidentsTool,
-  fetchInfrastructureContextTool,
 } from './tools';
 import {
   AIAnalysisSchema,
@@ -250,22 +250,22 @@ const generateBlastRadiusTool = tool({
 
 export const TriageResultSchema = z.object({
   rootCause: z.string(),
-  rootCauseConfidence: z.number().min(0).max(1),
+  rootCauseConfidence: z.number().describe('Confidence 0.0-1.0'),
   blastRadius: z.string(),
-  blastRadiusDetails: z.record(z.unknown()).optional(),
-  rtoEstimateMinutes: z.number().int().nonnegative(),
-  rpoEstimateMinutes: z.number().int().nonnegative(),
-  validatedSeverity: SeverityLevelSchema,
-  severityJustification: z.string().optional(),
-  immediateActions: z.array(z.string()).max(5),
+  rtoEstimateMinutes: z.number().describe('Recovery time objective in minutes'),
+  rpoEstimateMinutes: z.number().describe('Recovery point objective in minutes'),
+  validatedSeverity: z.number().describe('Severity level 1-5'),
+  severityJustification: z.string().nullable().describe('Reason for severity level'),
+  immediateActions: z.array(z.string()).describe('Up to 5 immediate recommended actions'),
   shouldEscalateToHuman: z.boolean(),
-  escalationReason: z.string().optional(),
-  runbookRecommendation: z.string().optional().describe('Recommended runbook ID or type'),
+  escalationReason: z.string().nullable().describe('Reason for escalation, or null'),
+  runbookRecommendation: z.string().nullable().describe('Recommended runbook ID or type, or null'),
   affectedPopulation: z
     .object({ min: z.number(), max: z.number() })
-    .optional(),
-  complianceRisk: z.array(z.string()).default([]),
-  analysisCompletedAt: z.string().datetime(),
+    .nullable()
+    .describe('Estimated min/max affected population, or null'),
+  complianceRisk: z.array(z.string()),
+  analysisCompletedAt: z.string(),
   agentSessionId: z.string(),
 });
 
@@ -288,8 +288,8 @@ export async function runTriageAgent(input: TriageAgentInput): Promise<TriageRes
   // Choose model based on priority — critical gets the more powerful reasoner
   const model =
     input.priority === 'critical'
-      ? google('gemini-2.5-pro')
-      : google('gemini-2.0-flash');
+      ? getProModel()
+      : getFlashModel();
 
   const prompt = [
     `Incident ID: ${input.incidentId}`,
@@ -312,13 +312,12 @@ export async function runTriageAgent(input: TriageAgentInput): Promise<TriageRes
       calculateRtoRpo: calculateRtoRpoTool,
       generateBlastRadius: generateBlastRadiusTool,
       // Shared tools
-      fetchMetrics: fetchMetricsTool,
+      checkShelterCapacity: checkShelterCapacityTool,
       updateIncidentStatus: updateIncidentStatusTool,
       fetchRunbook: fetchRunbookTool,
       logAgentAction: logAgentActionTool,
       notifyHuman: notifyHumanTool,
       searchSimilarIncidents: searchSimilarIncidentsTool,
-      fetchInfrastructureContext: fetchInfrastructureContextTool,
     },
     stopWhen: stepCountIs(15),
     maxRetries: 2,
@@ -337,7 +336,7 @@ export async function runTriageAgent(input: TriageAgentInput): Promise<TriageRes
   // This ensures we always return a valid, typed TriageResult regardless of how the agent
   // structured its narrative output.
   const { object: structuredResult } = await generateObject({
-    model: google('gemini-2.0-flash'),
+    model: getFlashModel(),
     schema: TriageResultSchema,
     prompt: [
       'Extract a structured TriageResult from this triage analysis:',

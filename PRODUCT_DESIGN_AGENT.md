@@ -98,18 +98,101 @@ Command Palette: Command component triggered by ⌘K for power-user navigation
 
 ### Theming Defaults
 
-```css
-/* Recommended token overrides for technical/ops tooling */
---radius: 0.375rem;          /* Tighter than default for density */
---font-sans: 'Inter', sans-serif;
---font-mono: 'JetBrains Mono', monospace;  /* For code, IDs, metrics */
+> **Source of truth:** `stitch/monolith_studio/DESIGN.md` — "The Precision Studio" / "The Monolith"
+> These tokens are implemented in `app/globals.css` via Tailwind v4 `@theme inline` blocks.
 
-/* Semantic palette for DR/ops context */
---color-healthy: hsl(142 71% 45%);    /* Green: systems nominal */
---color-degraded: hsl(38 92% 50%);    /* Amber: partial failure */
---color-critical: hsl(0 84% 60%);     /* Red: incident active */
---color-recovering: hsl(217 91% 60%); /* Blue: recovery in progress */
+#### The Monolith Design System
+
+**Creative North Star:** The interface should feel *carved from a single block of material* — like a high-end camera body or precision-milled hardware. Depth through tonal nesting, not structural lines.
+
+**The "No-Line" Rule:** Never use 1px solid high-contrast borders to section off UI. Use background shifts (surface layering) for separation. If a boundary is functionally required, use a "Ghost Border": `border-outline-variant/15` (15% opacity).
+
+**The "No-Divider" Rule:** No 1px lines between list items. Use `gap-y-3` vertical spacing or hover state background changes.
+
+```css
+/* Surface hierarchy — physical layers of matte material */
+--color-surface:                  #0e0e0e; /* Base canvas */
+--color-surface-container-lowest: #000000; /* Sunken wells, code blocks, inputs */
+--color-surface-container-low:    #131313; /* Cards, secondary panels */
+--color-surface-container:        #191a1a;
+--color-surface-container-high:   #1f2020; /* Floating panels, active overlays */
+--color-surface-container-highest:#252626;
+--color-surface-bright:           #2c2c2c; /* Hover states */
+
+/* Text — never #000000 on dark; use semantic tokens */
+--color-on-surface:               #e7e5e4; /* Primary text */
+--color-on-surface-variant:       #acabaa; /* Metadata, secondary text */
+
+/* Ghost border — only use at 15% opacity */
+--color-outline-variant:          #484848;
+
+/* Tertiary "studio glow" — always #679cff, never generic blue */
+--color-tertiary:                 #679cff;
+--color-tertiary-dim:             #0070eb;
+
+/* DR semantic states */
+--color-healthy:   hsl(142 71% 45%); /* Green: nominal */
+--color-degraded:  hsl(38 92% 50%);  /* Amber: partial failure */
+--color-critical:  hsl(0 84% 60%);   /* Red: incident active */
+--color-recovering:hsl(217 91% 60%); /* Blue: recovery in progress */
 ```
+
+#### Typography — The Hierarchical Engine
+
+**Inter exclusively.** Brand identity through weight and scale, not color.
+
+| Role        | Size     | Weight | Usage |
+|-------------|----------|--------|-------|
+| Display     | 2.75rem  | 700    | Hero impact, incident title |
+| Headline    | 1.5rem   | 600    | Section headers |
+| Title       | 1.0rem   | 500    | Card titles, component headers |
+| Body        | 0.875rem | 400    | Primary reading, descriptions |
+| Label       | 0.6875rem| 600    | ALL CAPS metadata, utility tags — add `tracking-[0.2rem]` |
+
+**JetBrains Mono** for: metric values, timestamps, IDs, terminal output.
+
+#### Elevation & Depth — Tonal Layering
+
+Traditional drop shadows are **forbidden**. Achieve lift optically:
+- **Cards on canvas:** `bg-surface-container-low` on `bg-surface` — delta is subtle but perceivable
+- **Floating elements (modals/popovers):** `shadow-[0_0_32px_0_rgba(231,229,228,0.08)]` — 32px blur, 8% on-surface opacity
+- **Glassmorphism (dropdowns/overlays):** `bg-surface-variant/80 backdrop-blur-[20px]`
+
+#### Buttons
+
+- **Primary:** `bg-tertiary-gradient` (`linear-gradient(145deg, #679cff 0%, #0070eb 100%)`), white text, `rounded-xl`
+- **Secondary:** `bg-secondary-container text-on-secondary-container`, no border
+- **Ghost:** No background, `text-primary`, hover `bg-surface-bright/50`
+
+#### Border Radius Scale
+
+```
+DEFAULT: 0.125rem   (hairline)
+lg:      0.25rem    (inputs)
+xl:      0.5rem     (cards)
+2xl:     0.75rem    (large panels)
+full:    9999px     (chips, pills)
+```
+
+#### Spacing Logic
+
+- Micro-interactions: `spacing-1` to `spacing-2`
+- Component padding: `p-4` to `p-5` (0.9rem–1.25rem)
+- Section gaps: `space-y-10` to `space-y-12`
+- Page gutters: `px-6` with `max-w-7xl mx-auto`
+
+#### Screen Designs (Stitch)
+
+Four reference screens are stored in `stitch/` (extracted from `stitch.zip`):
+
+| Screen | File | Purpose |
+|--------|------|---------|
+| EOC Dashboard | `eoc_dashboard_minimalist/` | Main command center — bento metrics, map/signal area, AI recommendation panel |
+| Field Home | `field_home_minimalist/` | Mobile operator view — voice recording, live transcription, activity feed |
+| Live Feed | `live_feed_minimalist/` | Signal stream — filter chips, signal cards grid with AI credibility bars, collapsible sidebar |
+| Citizen Reporter | `citizen_reporter_minimalist/` | Report submission — text area, media attach, AI validation status, broadcast CTA |
+
+The **EOC Dashboard** pattern is the main dashboard (`app/page.tsx`). The others map to future routes.
 
 ---
 
