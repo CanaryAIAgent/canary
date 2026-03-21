@@ -164,14 +164,12 @@ export function getDashboardData(): DashboardData {
 // ---------------------------------------------------------------------------
 
 export async function syncDashboardFromDb(): Promise<DashboardData> {
-  // Dynamic import to avoid pulling Supabase into every module that imports store
   const { dbListIncidents, dbListSocialSignals, dbListCameraAlerts, dbListAgentLogs } =
     await import('@/lib/db');
 
   try {
     const activeStatuses = ['new', 'triaging', 'responding', 'escalated'];
 
-    // Run queries in parallel
     const [activeIncidents, recentSignals, recentAlerts, recentLogs] = await Promise.all([
       dbListIncidents({ status: activeStatuses, limit: 100 }),
       dbListSocialSignals({ limit: 10 }),
@@ -179,82 +177,108 @@ export async function syncDashboardFromDb(): Promise<DashboardData> {
       dbListAgentLogs({ limit: 20 }),
     ]);
 
-    // Update stats
+    const hasDbData =
+      activeIncidents.length > 0 ||
+      recentSignals.length > 0 ||
+      recentAlerts.length > 0 ||
+      recentLogs.length > 0;
+
+    // Only overwrite in-memory state if Supabase actually has data.
+    // Otherwise keep whatever is in memory (from signal ingest, chat tools, etc.)
+    if (!hasDbData) {
+      return getDashboardData();
+    }
+
+    // Merge DB incidents count with in-memory count (take the higher)
     updateStats({
-      activeIncidents: activeIncidents.length,
-      incidentDelta: `${activeIncidents.length} active`,
-      signalHealthPct: recentSignals.length > 0 ? 100 : 0,
+      activeIncidents: Math.max(activeIncidents.length, stats.activeIncidents),
+      incidentDelta: activeIncidents.length > 0
+        ? `${activeIncidents.length} active`
+        : stats.incidentDelta,
+      signalHealthPct: recentSignals.length > 0 ? 100 : stats.signalHealthPct,
     });
 
-    // Build signal cards from social signals + camera alerts
-    signals.length = 0;
-    signalCounter = 0;
+    // Prepend DB signals before in-memory ones (DB = persisted, in-memory = recent)
+    const dbSignals: SignalCard[] = [];
+    let dbSigCount = 0;
 
     for (const sig of recentSignals) {
       const credMap: Record<string, number> = { high: 95, medium: 70, unverified: 40, disputed: 15 };
-      const colorMap: Record<string, string> = { high: 'green', medium: 'yellow', unverified: 'gray', disputed: 'red' };
-      signals.push({
-        id: `sig-${String(++signalCounter).padStart(3, '0')}`,
-        tag: sig.platform.toUpperCase(),
-        tagColor: 'blue',
+      dbSignals.push({
+        id: `db-sig-${String(++dbSigCount).padStart(3, '0')}`,
+        tag: `${sig.credibility.toUpperCase()} // ${sig.platform.toUpperCase()}`,
+        tagColor: sig.credibility === 'high' ? 'text-tertiary' : sig.credibility === 'disputed' ? 'text-error' : 'text-on-surface-variant',
         title: sig.aiSummary ?? sig.text.slice(0, 80),
         desc: sig.text,
         source: `@${sig.handle}`,
         credibility: credMap[sig.credibility] ?? 50,
-        credibilityColor: colorMap[sig.credibility] ?? 'gray',
+        credibilityColor: (credMap[sig.credibility] ?? 50) >= 80 ? 'bg-tertiary' : (credMap[sig.credibility] ?? 50) >= 50 ? 'bg-warning' : 'bg-error',
         time: timeSince(sig.ingestedAt),
-        icon: 'signal',
+        icon: 'person_search',
       });
     }
 
     for (const alert of recentAlerts) {
-      signals.push({
-        id: `sig-${String(++signalCounter).padStart(3, '0')}`,
-        tag: 'CAMERA',
-        tagColor: 'red',
+      dbSignals.push({
+        id: `db-sig-${String(++dbSigCount).padStart(3, '0')}`,
+        tag: `LIVE // CAMERA`,
+        tagColor: alert.severity >= 4 ? 'text-error' : 'text-tertiary',
         title: alert.detectedEvent,
         desc: alert.aiAnalysis ?? alert.detectedEvent,
         source: alert.cameraName,
         credibility: Math.round(alert.confidence * 100),
-        credibilityColor: alert.confidence >= 0.8 ? 'green' : alert.confidence >= 0.5 ? 'yellow' : 'red',
+        credibilityColor: alert.confidence >= 0.8 ? 'bg-tertiary' : alert.confidence >= 0.5 ? 'bg-warning' : 'bg-error',
         time: timeSince(alert.createdAt),
-        icon: 'camera',
+        icon: 'videocam',
       });
     }
 
-    // Build activity from agent logs
-    activity.length = 0;
-    activityCounter = 0;
-
-    for (const log of recentLogs) {
-      activity.push({
-        id: `act-${String(++activityCounter).padStart(3, '0')}`,
-        actor: log.agentType,
-        action: log.decisionRationale.slice(0, 120),
-        time: timeSince(log.timestamp),
-      });
+    // Merge: in-memory signals first (newest), then DB signals, capped at 20
+    if (dbSignals.length > 0) {
+      const existingIds = new Set(signals.map((s) => s.title));
+      const deduped = dbSignals.filter((s) => !existingIds.has(s.title));
+      signals.push(...deduped);
+      if (signals.length > 20) signals.length = 20;
     }
 
-    // Build protocol steps from the latest active incident's runbook steps
-    if (activeIncidents.length > 0) {
+    // Merge DB activity with in-memory (prepend DB logs that aren't already there)
+    if (recentLogs.length > 0) {
+      const existingActions = new Set(activity.map((a) => a.action));
+      for (const log of recentLogs) {
+        const action = log.decisionRationale.slice(0, 120);
+        if (!existingActions.has(action)) {
+          activity.push({
+            id: `db-act-${log.id.slice(0, 8)}`,
+            actor: log.agentType,
+            action,
+            time: timeSince(log.timestamp),
+          });
+        }
+      }
+      if (activity.length > 50) activity.length = 50;
+    }
+
+    // Build protocol steps from the latest active incident's runbook
+    if (activeIncidents.length > 0 && protocolSteps.length === 0) {
       try {
         const { dbGetRunbook } = await import('@/lib/db');
         const latestIncident = activeIncidents[0];
         const runbook = await dbGetRunbook({ incidentType: latestIncident.type });
         if (runbook && runbook.steps.length > 0) {
-          const steps = runbook.steps.map((s) => ({
-            step: s.title,
-            done: s.status === 'completed',
-            active: s.status === 'running',
-          }));
-          setProtocolSteps(steps);
+          setProtocolSteps(
+            runbook.steps.map((s) => ({
+              step: s.title,
+              done: s.status === 'completed',
+              active: s.status === 'running',
+            })),
+          );
         }
       } catch {
-        // Runbook fetch failed — keep existing protocol steps
+        // Keep existing protocol steps
       }
     }
   } catch (err) {
-    console.error('[syncDashboardFromDb] Error syncing from DB, using in-memory fallback:', err);
+    console.error('[syncDashboardFromDb] Error syncing from DB:', err);
   }
 
   return getDashboardData();

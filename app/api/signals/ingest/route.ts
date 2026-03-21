@@ -12,6 +12,7 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 import { getFlashModel } from '@/lib/ai/config';
 import { addSignal, addActivity, updateStats, stats } from '@/lib/data/store';
+import { dbInsertIncident } from '@/lib/db';
 
 export const maxDuration = 30;
 
@@ -92,10 +93,44 @@ Choose an appropriate Material Symbols icon name (e.g. "apartment" for structura
       });
     }
 
+    // Persist to Supabase — create an incident for actionable signals
+    let incidentId: string | undefined;
+    if (analysis.isEmergency || analysis.severity >= 3) {
+      try {
+        const incidentType = ['flood', 'fire', 'structural', 'medical', 'hazmat', 'infrastructure'].includes(analysis.category)
+          ? analysis.category as 'flood' | 'fire' | 'structural' | 'medical' | 'hazmat' | 'infrastructure'
+          : 'other' as const;
+
+        const incident = await dbInsertIncident({
+          title: analysis.title,
+          description: analysis.summary,
+          type: incidentType,
+          severity: Math.round(Math.min(5, Math.max(1, analysis.severity))),
+          status: 'new',
+          location: analysis.extractedLocation
+            ? { description: analysis.extractedLocation }
+            : {},
+          sources: [parsed.data.type === 'social' ? 'social' : parsed.data.type === 'camera' ? 'camera' : 'field'],
+          mediaUrls: parsed.data.mediaUrl ? [parsed.data.mediaUrl] : [],
+          corroboratedBySignals: [],
+          linkedCameraAlerts: [],
+        });
+        incidentId = incident.id;
+
+        addActivity(
+          'Signal Processor',
+          `Created incident ${incident.id} from ${parsed.data.type} signal`,
+        );
+      } catch (dbErr) {
+        console.error('[signals/ingest] DB persist failed (non-fatal):', dbErr);
+      }
+    }
+
     return Response.json({
       success: true,
       data: {
         signalId: card.id,
+        incidentId,
         analysis,
       },
     });
