@@ -5,6 +5,7 @@
 // Layout: App Shell with sidebar + main content + sticky AI panel
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 
@@ -31,6 +32,7 @@ interface SignalCard {
   time: string;
   icon: string;
   empty?: boolean;
+  incidentId?: string;
 }
 
 interface ActivityEntry {
@@ -285,6 +287,7 @@ function formatMetricValue(value: number, padded: boolean): string {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
+  const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
@@ -554,12 +557,12 @@ export default function Dashboard() {
                         </button>
                         <button
                           onClick={() => {
-                            setChatOpen(true);
-                            setChatInput(`Generate an ICS-209 incident status summary report for "${incident.title}" (ID: ${incident.id}, type: ${incident.type}, severity: ${incident.severity}). Include situation summary, resource needs, and recommended actions.`);
+                            router.push(`/incidents/${incident.id}`);
                           }}
-                          className="px-5 py-2 bg-secondary-container text-on-secondary-container font-semibold text-sm rounded-lg hover:bg-surface-bright transition-colors"
+                          className="px-5 py-2 bg-secondary-container text-on-secondary-container font-semibold text-sm rounded-lg hover:bg-surface-bright transition-colors flex items-center gap-2"
                         >
-                          Generate Report
+                          <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                          View Incident
                         </button>
                       </>
                     ) : (
@@ -675,7 +678,8 @@ export default function Dashboard() {
                     signalCards.map((card, i) => (
                       <article
                         key={card.id ?? i}
-                        className="bg-surface-container-low border border-outline-variant/15 rounded-xl overflow-hidden group hover:border-outline-variant/30 transition-colors"
+                        onClick={() => { if (card.incidentId) router.push(`/incidents/${card.incidentId}`); }}
+                        className={`bg-surface-container-low border border-outline-variant/15 rounded-xl overflow-hidden group hover:border-outline-variant/30 transition-colors ${card.incidentId ? "cursor-pointer" : ""}`}
                       >
                         {card.empty ? (
                           <div className="h-36 flex flex-col items-center justify-center opacity-30">

@@ -32,6 +32,7 @@ export interface SignalCard {
   time: string;
   icon: string;
   empty?: boolean;
+  incidentId?: string;
 }
 
 export interface ActivityEntry {
@@ -278,6 +279,7 @@ export async function syncDashboardFromDb(): Promise<DashboardData> {
         credibilityColor: inc.severity >= 4 ? 'bg-tertiary' : inc.severity >= 3 ? 'bg-tertiary' : 'bg-warning',
         time: timeSince(inc.createdAt),
         icon: incidentIconMap[inc.type] ?? 'sensors',
+        incidentId: inc.id,
       });
     }
 
