@@ -552,25 +552,38 @@ export default function Dashboard() {
 
         {/* Nav links */}
         <nav className="flex flex-col gap-1 px-2 flex-1">
-          <button
+          <a
+            href="/"
             className="flex items-center gap-4 px-2 py-2.5 rounded-lg bg-surface-container-high text-tertiary"
             aria-label="Dashboard"
             aria-current="page"
           >
             <div className="min-w-[24px] flex justify-center">
-              <span className="text-[12px] font-bold">D</span>
+              <span className="material-symbols-outlined text-[20px]">dashboard</span>
             </div>
             <span className="font-medium text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200">
               Dashboard
             </span>
-          </button>
+          </a>
+          <a
+            href="/chat"
+            className="flex items-center gap-4 px-2 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors"
+            aria-label="Chat"
+          >
+            <div className="min-w-[24px] flex justify-center">
+              <span className="material-symbols-outlined text-[20px]">forum</span>
+            </div>
+            <span className="font-medium text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              Chat
+            </span>
+          </a>
           <a
             href="/settings"
             className="flex items-center gap-4 px-2 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors"
             aria-label="Settings"
           >
             <div className="min-w-[24px] flex justify-center">
-              <span className="text-[12px] font-bold">S</span>
+              <span className="material-symbols-outlined text-[20px]">settings</span>
             </div>
             <span className="font-medium text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200">
               Settings
