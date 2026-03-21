@@ -19,6 +19,9 @@ import {
   searchSimilarIncidentsTool,
   logAgentActionTool,
   notifyHumanTool,
+  sendTelegramAlertTool,
+  broadcastTelegramAlertTool,
+  sendTelegramMessageTool,
 } from '@/lib/agents/tools';
 import {
   addSignal,
@@ -65,6 +68,14 @@ You can push updates to the live dashboard using these tools:
 - When asked to REPORT a new signal: use pushSignal (which creates an incident automatically).
 - When asked to GENERATE A REPORT: provide a detailed analysis as text and use pushRecommendation to summarize key findings.
 - ALWAYS push updates to the dashboard — don't just respond with text.
+
+## Telegram Integration
+You can send alerts and messages to Telegram using these tools:
+- sendTelegramAlert: Send a formatted alert to a specific Telegram chat by chat ID
+- broadcastTelegramAlert: Fan out an alert to ALL subscribed Telegram chats (use for severity 3+ signals)
+- sendTelegramMessage: Send a freeform HTML message to a specific chat
+
+When a high-severity signal is identified or an incident is created, consider broadcasting to Telegram subscribers so field teams and commanders get notified instantly.
 
 ## Context
 Current dashboard state will be provided. Use it to inform your responses and avoid duplicate entries.`;
@@ -273,6 +284,11 @@ export async function POST(req: Request) {
       searchSimilarIncidents: searchSimilarIncidentsTool,
       logAgentAction: logAgentActionTool,
       notifyHuman: notifyHumanTool,
+
+      // Telegram integration tools
+      sendTelegramAlert: sendTelegramAlertTool,
+      broadcastTelegramAlert: broadcastTelegramAlertTool,
+      sendTelegramMessage: sendTelegramMessageTool,
     },
   });
 

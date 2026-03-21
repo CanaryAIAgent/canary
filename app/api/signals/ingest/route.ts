@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { getFlashModel } from '@/lib/ai/config';
 import { addSignal, addActivity, updateStats, stats } from '@/lib/data/store';
 import { dbInsertIncident } from '@/lib/db';
+import { broadcastAlert } from '@/lib/integrations/telegram';
 
 export const maxDuration = 30;
 
@@ -124,6 +125,17 @@ Choose an appropriate Material Symbols icon name (e.g. "apartment" for structura
       } catch (dbErr) {
         console.error('[signals/ingest] DB persist failed (non-fatal):', dbErr);
       }
+    }
+
+    // Broadcast to subscribed Telegram chats for severity 3+ signals
+    if (analysis.severity >= 3) {
+      broadcastAlert({
+        title: analysis.title,
+        severity: analysis.severity,
+        summary: analysis.summary,
+        location: analysis.extractedLocation,
+        source: parsed.data.source ?? parsed.data.type,
+      }).catch((err) => console.error('[signals/ingest] telegram broadcast error', err));
     }
 
     return Response.json({

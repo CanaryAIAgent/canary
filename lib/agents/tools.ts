@@ -27,6 +27,48 @@ import {
   dbInsertAgentLog,
   dbGetRunbook,
 } from '@/lib/db';
+import { sendAlert, sendMessage, broadcastAlert, subscribedChats } from '@/lib/integrations/telegram';
+
+// ---------------------------------------------------------------------------
+// Database / persistence helpers
+// Abstracted so the tool implementations stay clean.
+// In production, replace stubs with actual @vercel/postgres queries.
+// ---------------------------------------------------------------------------
+
+async function dbInsertIncident(data: Omit<Incident, 'id' | 'createdAt' | 'updatedAt'>): Promise<Incident> {
+  // Production: import { sql } from '@vercel/postgres'; await sql`INSERT INTO incidents ...`
+  const now = new Date().toISOString();
+  return {
+    id: crypto.randomUUID(),
+    createdAt: now,
+    updatedAt: now,
+    ...data,
+  } as Incident;
+}
+
+async function dbGetIncident(id: string): Promise<Incident | null> {
+  // Production: SELECT * FROM incidents WHERE id = $1
+  void id;
+  return null;
+}
+
+async function dbUpdateIncident(id: string, data: Partial<Incident>): Promise<Incident | null> {
+  // Production: UPDATE incidents SET ... WHERE id = $1 RETURNING *
+  void id;
+  void data;
+  return null;
+}
+
+async function dbInsertAgentLog(log: Omit<AgentLog, 'id'>): Promise<void> {
+  // Production: INSERT INTO agent_logs ...
+  void log;
+}
+
+async function dbGetRunbook(filters: { incidentType?: string; id?: string }): Promise<unknown> {
+  // Production: SELECT * FROM runbooks WHERE incident_type = $1 AND is_active = true
+  void filters;
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // checkShelterCapacity — query shelter status and available capacity
@@ -441,6 +483,100 @@ export const searchSimilarIncidentsTool = tool({
 });
 
 // ---------------------------------------------------------------------------
+// sendTelegramAlert — push an alert to a specific Telegram chat
+// ---------------------------------------------------------------------------
+
+export const sendTelegramAlertTool = tool({
+  description:
+    'Send a formatted alert to a specific Telegram chat or group. ' +
+    'Use this to notify a specific Telegram user or group about an incident. ' +
+    'Requires the numeric Telegram chat ID.',
+  inputSchema: z.object({
+    chatId: z.number().describe('Telegram chat ID to send the alert to'),
+    title: z.string().describe('Alert title'),
+    severity: SeverityLevelSchema,
+    summary: z.string().describe('Brief summary of the alert'),
+    location: z.string().optional(),
+    source: z.string().optional(),
+  }),
+  execute: async ({ chatId, title, severity, summary, location, source }) => {
+    try {
+      await sendAlert(chatId, { title, severity, summary, location, source });
+      return {
+        success: true,
+        chatId,
+        message: `Alert sent to Telegram chat ${chatId}`,
+        sentAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        chatId,
+        error: error instanceof Error ? error.message : 'Failed to send Telegram alert',
+      };
+    }
+  },
+});
+
+// ---------------------------------------------------------------------------
+// broadcastTelegramAlert — fan out to all subscribed Telegram chats
+// ---------------------------------------------------------------------------
+
+export const broadcastTelegramAlertTool = tool({
+  description:
+    'Broadcast an alert to ALL subscribed Telegram chats. ' +
+    'Use this when a high-severity signal (3+) needs to reach all Telegram subscribers. ' +
+    'This is a fan-out operation — it sends to every chat that has used /subscribe.',
+  inputSchema: z.object({
+    title: z.string().describe('Alert title'),
+    severity: SeverityLevelSchema,
+    summary: z.string().describe('Brief summary of the alert'),
+    location: z.string().optional(),
+    source: z.string().optional(),
+  }),
+  execute: async ({ title, severity, summary, location, source }) => {
+    const count = subscribedChats.size;
+    if (count === 0) {
+      return { success: true, sentTo: 0, message: 'No subscribed Telegram chats' };
+    }
+
+    await broadcastAlert({ title, severity, summary, location, source });
+    return {
+      success: true,
+      sentTo: count,
+      message: `Alert broadcast to ${count} Telegram chat(s)`,
+      sentAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ---------------------------------------------------------------------------
+// sendTelegramMessage — send a freeform message to a Telegram chat
+// ---------------------------------------------------------------------------
+
+export const sendTelegramMessageTool = tool({
+  description:
+    'Send a freeform HTML-formatted message to a Telegram chat. ' +
+    'Use this for non-alert communications like status updates, confirmations, or summaries.',
+  inputSchema: z.object({
+    chatId: z.number().describe('Telegram chat ID'),
+    text: z.string().describe('HTML-formatted message text'),
+  }),
+  execute: async ({ chatId, text }) => {
+    try {
+      await sendMessage(chatId, text);
+      return { success: true, chatId, sentAt: new Date().toISOString() };
+    } catch (error) {
+      return {
+        success: false,
+        chatId,
+        error: error instanceof Error ? error.message : 'Failed to send message',
+      };
+    }
+  },
+});
+
+// ---------------------------------------------------------------------------
 // Export all tools as a collection for easy agent composition
 // ---------------------------------------------------------------------------
 
@@ -454,4 +590,7 @@ export const sharedTools = {
   generateICSReport: generateICSReportTool,
   deliverToSink: deliverToSinkTool,
   searchSimilarIncidents: searchSimilarIncidentsTool,
+  sendTelegramAlert: sendTelegramAlertTool,
+  broadcastTelegramAlert: broadcastTelegramAlertTool,
+  sendTelegramMessage: sendTelegramMessageTool,
 };
