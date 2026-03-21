@@ -11,7 +11,7 @@
  *   /help        — Show available commands
  */
 
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { sendTelegramMessage } from '@/lib/integrations/telegram';
 import {
   dbUpsertTelegramSubscriber,
@@ -192,28 +192,33 @@ export async function POST(req: Request) {
   const command = match[1].toLowerCase();
   const args = match[2];
 
-  switch (command) {
-    case 'start':
-      await handleStart(chatId);
-      break;
-    case 'help':
-      await handleHelp(chatId);
-      break;
-    case 'subscribe':
-      await handleSubscribe(chatId, args);
-      break;
-    case 'unsubscribe':
-      await handleUnsubscribe(chatId);
-      break;
-    case 'status':
-      await handleStatus(chatId);
-      break;
-    default:
-      await sendTelegramMessage(
-        chatId,
-        `Unknown command: /${command}\n\nType /help to see available commands.`,
-      );
-  }
+  // Respond to Telegram immediately, process the command in the background.
+  // Telegram delivers updates sequentially — it won't send the next update
+  // until we respond to this one.
+  after(async () => {
+    switch (command) {
+      case 'start':
+        await handleStart(chatId);
+        break;
+      case 'help':
+        await handleHelp(chatId);
+        break;
+      case 'subscribe':
+        await handleSubscribe(chatId, args);
+        break;
+      case 'unsubscribe':
+        await handleUnsubscribe(chatId);
+        break;
+      case 'status':
+        await handleStatus(chatId);
+        break;
+      default:
+        await sendTelegramMessage(
+          chatId,
+          `Unknown command: /${command}\n\nType /help to see available commands.`,
+        );
+    }
+  });
 
   return NextResponse.json({ ok: true });
 }
