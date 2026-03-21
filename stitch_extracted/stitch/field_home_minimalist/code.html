@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Canary | Field Home</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-error": "#490106",
+              "error-container": "#7f2927",
+              "on-secondary-fixed-variant": "#5c5b5b",
+              "on-tertiary-fixed-variant": "#f8f8ff",
+              "error": "#ee7d77",
+              "on-primary-container": "#d0d0d0",
+              "secondary-fixed": "#e4e2e1",
+              "surface": "#0e0e0e",
+              "on-surface-variant": "#acabaa",
+              "tertiary-fixed-dim": "#006ee6",
+              "primary-fixed": "#e2e2e2",
+              "on-error-container": "#ff9993",
+              "background": "#0e0e0e",
+              "surface-container-lowest": "#000000",
+              "on-secondary": "#202020",
+              "secondary": "#9f9d9d",
+              "on-secondary-container": "#c1bfbe",
+              "secondary-fixed-dim": "#d6d4d3",
+              "primary-dim": "#b8b9b9",
+              "inverse-surface": "#fcf8f8",
+              "primary": "#c6c6c7",
+              "on-tertiary-container": "#000000",
+              "inverse-primary": "#5e5f60",
+              "on-background": "#e7e5e4",
+              "on-secondary-fixed": "#3f3f3f",
+              "on-primary-fixed-variant": "#5a5c5c",
+              "surface-variant": "#252626",
+              "secondary-container": "#3b3b3b",
+              "surface-container-low": "#131313",
+              "tertiary-dim": "#0070eb",
+              "on-primary-fixed": "#3e4040",
+              "error-dim": "#bb5551",
+              "surface-bright": "#2c2c2c",
+              "tertiary-container": "#007aff",
+              "on-primary": "#3f4041",
+              "inverse-on-surface": "#565554",
+              "on-tertiary-fixed": "#ffffff",
+              "primary-fixed-dim": "#d4d4d4",
+              "surface-tint": "#c6c6c7",
+              "tertiary-fixed": "#007aff",
+              "on-surface": "#e7e5e4",
+              "secondary-dim": "#9f9d9d",
+              "surface-container-highest": "#252626",
+              "surface-dim": "#0e0e0e",
+              "outline": "#767575",
+              "tertiary": "#679cff",
+              "on-tertiary": "#001f4a",
+              "surface-container": "#191a1a",
+              "surface-container-high": "#1f2020",
+              "outline-variant": "#484848",
+              "primary-container": "#454747"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"],
+              "mono": ["JetBrains Mono"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+        }
+        .mono-text { font-family: 'JetBrains Mono', monospace; }
+        .glass { background: rgba(37, 38, 38, 0.8); backdrop-filter: blur(20px); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body selection:bg-tertiary/30">
+<!-- TopAppBar -->
+<header class="flex items-center justify-between w-full px-6 h-14 bg-[#0e0e0e] border-b border-[#484848]/15 docked full-width top-0 z-50 fixed">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#679cff]" data-icon="sensors">sensors</span>
+<h1 class="text-[#e7e5e4] font-bold text-base tracking-tighter">Canary | INC-882</h1>
+</div>
+<div class="flex items-center gap-4">
+<div class="font-['Inter'] font-semibold text-sm tracking-wider uppercase text-[#e7e5e4]">
+                OPERATOR 01
+            </div>
+<div class="w-8 h-8 rounded-full bg-surface-container-high border border-outline-variant/15 flex items-center justify-center overflow-hidden">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="Operator profile avatar with dark theme styling" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAO99qKgXfft84BEw4ADbBFGXUwmiF6c6h41bJZQ7FDxaDAC57rPtikAMD98dX9NcqwEpiYuWkBaU0R85zkUc92umVcboZo5bITamiIUpWK-YTZC2HNjsjx5wWitJgQIQoFsHUujsRuRkzEUWtYRCpIl8TqplAgOSAiqjStZ_wcxhLLSbAoEXa25pMVzCdM9Jwsq0zvAFxa1BFvecCTdF3Vp_fTTZKog_qLdUzc1PO0IFEYaiRyTGQnKQMYhyfuq87OU2V1qZ_wDlMO"/>
+</div>
+</div>
+</header>
+<main class="pt-20 pb-24 px-6 max-w-5xl mx-auto space-y-10">
+<!-- Status Row: Bento Style -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<!-- Network Status Card -->
+<div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/15 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-tertiary" data-icon="router">router</span>
+<div>
+<p class="text-on-surface-variant text-[10px] font-semibold uppercase tracking-widest">Network</p>
+<p class="text-on-surface font-medium text-sm">Satellite Mesh</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-[10px] text-on-surface-variant font-mono">14ms</span>
+<div class="w-2 h-2 rounded-full bg-tertiary shadow-[0_0_8px_#679cff]"></div>
+</div>
+</div>
+<!-- AI Engine Card -->
+<div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/15 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-tertiary" data-icon="psychology">psychology</span>
+<div>
+<p class="text-on-surface-variant text-[10px] font-semibold uppercase tracking-widest">AI Engine</p>
+<p class="text-on-surface font-medium text-sm">Local Model v4.2</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-[10px] text-on-surface-variant font-mono">Active</span>
+<div class="w-2 h-2 rounded-full bg-tertiary shadow-[0_0_8px_#679cff]"></div>
+</div>
+</div>
+<!-- Battery/Power Card -->
+<div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/15 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="battery_charging_80">battery_charging_80</span>
+<div>
+<p class="text-on-surface-variant text-[10px] font-semibold uppercase tracking-widest">Unit Power</p>
+<p class="text-on-surface font-medium text-sm">82% Remaining</p>
+</div>
+</div>
+<span class="text-[10px] text-on-surface-variant font-mono">4.2h</span>
+</div>
+</section>
+<!-- Main Action & Transcription Section -->
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+<!-- Record Control -->
+<div class="flex flex-col items-center justify-center space-y-8 bg-surface-container-lowest/50 rounded-2xl p-12 border border-outline-variant/5">
+<div class="relative group">
+<!-- Subtle Glow Effect -->
+<div class="absolute inset-0 bg-tertiary/20 blur-3xl rounded-full scale-110 opacity-50 group-hover:opacity-100 transition-opacity"></div>
+<button class="relative w-48 h-48 rounded-full bg-surface-container-high border border-outline-variant/20 flex flex-col items-center justify-center gap-2 group active:scale-95 transition-all shadow-2xl">
+<span class="material-symbols-outlined text-tertiary text-6xl" data-icon="mic" data-weight="fill" style="font-variation-settings: 'FILL' 1;">mic</span>
+<span class="text-[10px] font-bold tracking-[0.3em] uppercase text-on-surface-variant">Tap to Record</span>
+</button>
+</div>
+<div class="text-center">
+<h2 class="text-on-surface font-semibold text-lg">Voice Protocol Alpha</h2>
+<p class="text-on-surface-variant text-sm mt-1 max-w-xs">Reporting live incident data directly to Incident Command center via local encryption.</p>
+</div>
+</div>
+<!-- Transcription Area -->
+<div class="bg-surface-container-low rounded-2xl flex flex-col overflow-hidden border border-outline-variant/10">
+<div class="px-6 py-4 bg-surface-container-high border-b border-outline-variant/10 flex justify-between items-center">
+<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span> Live Stream
+                    </span>
+<span class="text-[10px] font-mono text-tertiary">00:12:44</span>
+</div>
+<div class="p-6 h-[240px] overflow-y-auto scrollbar-hide space-y-4">
+<div class="flex gap-4">
+<span class="text-[10px] font-mono text-outline py-1">14:02:11</span>
+<p class="text-on-surface mono-text text-sm leading-relaxed">
+<span class="text-tertiary">SYSTEM:</span> Initializing spatial mapping of Sector 4...
+                        </p>
+</div>
+<div class="flex gap-4">
+<span class="text-[10px] font-mono text-outline py-1">14:02:15</span>
+<p class="text-on-surface mono-text text-sm leading-relaxed">
+<span class="text-tertiary">OPERATOR:</span> Multiple structural collapses identified at intersection of Pine and 4th. Requesting immediate drone recon for internal assessment.
+                        </p>
+</div>
+<div class="flex gap-4">
+<span class="text-[10px] font-mono text-outline py-1">14:02:22</span>
+<p class="text-on-surface mono-text text-sm leading-relaxed">
+<span class="text-tertiary">AI_PROCESS:</span> Entities extracted: Structural Failure, Pine St, 4th Ave. Priority level elevated to <span class="text-error">CRITICAL</span>.
+                        </p>
+</div>
+<div class="flex gap-4 opacity-50">
+<span class="text-[10px] font-mono text-outline py-1">14:02:30</span>
+<p class="text-on-surface mono-text text-sm italic">
+                            Processing ongoing audio feed...
+                        </p>
+</div>
+</div>
+<div class="p-4 bg-surface-container-lowest border-t border-outline-variant/5">
+<div class="flex items-center gap-2 text-[10px] font-mono text-on-surface-variant">
+<span class="material-symbols-outlined text-xs" data-icon="terminal">terminal</span>
+<span>LOGS READY FOR UPLOAD</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Recent Activity Feed -->
+<section class="space-y-6">
+<div class="flex justify-between items-end">
+<div>
+<h3 class="headline-sm text-on-surface">Recent Activity</h3>
+<p class="text-on-surface-variant text-sm mt-1">Validated incidents within a 5km radius</p>
+</div>
+<button class="text-tertiary text-xs font-bold uppercase tracking-widest hover:bg-surface-bright/50 px-3 py-2 rounded-lg transition-colors">View All Archive</button>
+</div>
+<div class="space-y-3">
+<!-- Activity Card 1 -->
+<div class="bg-surface-container-low hover:bg-surface-container border border-outline-variant/10 rounded-xl p-4 flex items-center justify-between transition-all group cursor-pointer">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center text-error">
+<span class="material-symbols-outlined" data-icon="warning" data-weight="fill" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<div>
+<p class="text-on-surface font-semibold text-sm">Gas Leakage Detected</p>
+<p class="text-on-surface-variant text-[11px]">Industrial Sector - Warehouse B</p>
+</div>
+</div>
+<div class="text-right flex flex-col items-end gap-1">
+<span class="text-[10px] font-mono text-on-surface-variant">2m ago</span>
+<span class="text-[10px] px-2 py-0.5 rounded-full bg-error-container text-on-error-container font-bold uppercase">High Priority</span>
+</div>
+</div>
+<!-- Activity Card 2 -->
+<div class="bg-surface-container-low hover:bg-surface-container border border-outline-variant/10 rounded-xl p-4 flex items-center justify-between transition-all group cursor-pointer">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined" data-icon="medical_services">medical_services</span>
+</div>
+<div>
+<p class="text-on-surface font-semibold text-sm">Medical Assist Dispatched</p>
+<p class="text-on-surface-variant text-[11px]">Suburban East - Unit 12</p>
+</div>
+</div>
+<div class="text-right flex flex-col items-end gap-1">
+<span class="text-[10px] font-mono text-on-surface-variant">15m ago</span>
+<span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant font-bold uppercase">Dispatched</span>
+</div>
+</div>
+<!-- Activity Card 3 -->
+<div class="bg-surface-container-low hover:bg-surface-container border border-outline-variant/10 rounded-xl p-4 flex items-center justify-between transition-all group cursor-pointer">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="check_circle">check_circle</span>
+</div>
+<div>
+<p class="text-on-surface font-semibold text-sm">Perimeter Secure</p>
+<p class="text-on-surface-variant text-[11px]">Checkpoint 09 - All clear</p>
+</div>
+</div>
+<div class="text-right flex flex-col items-end gap-1">
+<span class="text-[10px] font-mono text-on-surface-variant">42m ago</span>
+<span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant font-bold uppercase">Resolved</span>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center h-16 pb-safe bg-[#0e0e0e]/80 backdrop-blur-xl border-t border-[#484848]/15 z-50">
+<button class="flex flex-col items-center justify-center text-[#679cff] scale-110 transition-transform active:scale-95 duration-100">
+<span class="material-symbols-outlined" data-icon="home" data-weight="fill" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-['Inter'] font-medium text-[8px] tracking-[0.1rem] uppercase mt-1">HOME</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#484848] hover:text-[#e7e5e4] transition-colors active:scale-95 duration-100">
+<span class="material-symbols-outlined" data-icon="activity">search_activity</span>
+<span class="font-['Inter'] font-medium text-[8px] tracking-[0.1rem] uppercase mt-1">FEED</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#484848] hover:text-[#e7e5e4] transition-colors active:scale-95 duration-100">
+<span class="material-symbols-outlined" data-icon="explore">explore</span>
+<span class="font-['Inter'] font-medium text-[8px] tracking-[0.1rem] uppercase mt-1">MAP</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#484848] hover:text-[#e7e5e4] transition-colors active:scale-95 duration-100">
+<span class="material-symbols-outlined" data-icon="shield">shield</span>
+<span class="font-['Inter'] font-medium text-[8px] tracking-[0.1rem] uppercase mt-1">SECURE</span>
+</button>
+</nav>
+</body></html>

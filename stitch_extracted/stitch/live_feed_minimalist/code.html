@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Canary | EOC Live Feed</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-error": "#490106",
+              "error-container": "#7f2927",
+              "on-secondary-fixed-variant": "#5c5b5b",
+              "on-tertiary-fixed-variant": "#f8f8ff",
+              "error": "#ee7d77",
+              "on-primary-container": "#d0d0d0",
+              "secondary-fixed": "#e4e2e1",
+              "surface": "#0e0e0e",
+              "on-surface-variant": "#acabaa",
+              "tertiary-fixed-dim": "#006ee6",
+              "primary-fixed": "#e2e2e2",
+              "on-error-container": "#ff9993",
+              "background": "#0e0e0e",
+              "surface-container-lowest": "#000000",
+              "on-secondary": "#202020",
+              "secondary": "#9f9d9d",
+              "on-secondary-container": "#c1bfbe",
+              "secondary-fixed-dim": "#d6d4d3",
+              "primary-dim": "#b8b9b9",
+              "inverse-surface": "#fcf8f8",
+              "primary": "#c6c6c7",
+              "on-tertiary-container": "#000000",
+              "inverse-primary": "#5e5f60",
+              "on-background": "#e7e5e4",
+              "on-secondary-fixed": "#3f3f3f",
+              "on-primary-fixed-variant": "#5a5c5c",
+              "surface-variant": "#252626",
+              "secondary-container": "#3b3b3b",
+              "surface-container-low": "#131313",
+              "tertiary-dim": "#0070eb",
+              "on-primary-fixed": "#3e4040",
+              "error-dim": "#bb5551",
+              "surface-bright": "#2c2c2c",
+              "tertiary-container": "#007aff",
+              "on-primary": "#3f4041",
+              "inverse-on-surface": "#565554",
+              "on-tertiary-fixed": "#ffffff",
+              "primary-fixed-dim": "#d4d4d4",
+              "surface-tint": "#c6c6c7",
+              "tertiary-fixed": "#007aff",
+              "on-surface": "#e7e5e4",
+              "secondary-dim": "#9f9d9d",
+              "surface-container-highest": "#252626",
+              "surface-dim": "#0e0e0e",
+              "outline": "#767575",
+              "tertiary": "#679cff",
+              "on-tertiary": "#001f4a",
+              "surface-container": "#191a1a",
+              "surface-container-high": "#1f2020",
+              "outline-variant": "#484848",
+              "primary-container": "#454747"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            height: 2px;
+            width: 2px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #484848;
+        }
+        .glass-panel {
+            background: rgba(37, 38, 38, 0.8);
+            backdrop-filter: blur(20px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body selection:bg-tertiary selection:text-on-tertiary">
+<!-- TopAppBar -->
+<header class="flex items-center justify-between w-full px-6 h-14 bg-[#0e0e0e] border-b border-[#484848]/15 fixed top-0 z-50">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#679cff]" data-icon="sensors">sensors</span>
+<span class="font-['Inter'] font-semibold text-sm tracking-wider uppercase text-[#e7e5e4]">Canary | INC-882</span>
+</div>
+<div class="flex items-center gap-6">
+<nav class="hidden md:flex items-center gap-6">
+<a class="font-['Inter'] font-semibold text-sm tracking-wider uppercase text-[#679cff]" href="#">Live Feed</a>
+<a class="font-['Inter'] font-semibold text-sm tracking-wider uppercase text-[#e7e5e4] hover:bg-[#2c2c2c]/50 transition-colors px-2 py-1" href="#">Analytics</a>
+<a class="font-['Inter'] font-semibold text-sm tracking-wider uppercase text-[#e7e5e4] hover:bg-[#2c2c2c]/50 transition-colors px-2 py-1" href="#">Map</a>
+</nav>
+<div class="h-8 w-8 rounded-full bg-surface-container-high flex items-center justify-center border border-outline-variant/15">
+<span class="material-symbols-outlined text-xs" data-icon="person">person</span>
+</div>
+</div>
+</header>
+<main class="pt-20 pb-24 px-6 max-w-7xl mx-auto space-y-12">
+<!-- Incident Summary Header -->
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<div class="lg:col-span-2 p-8 bg-surface-container-low border border-outline-variant/15 rounded-xl flex flex-col justify-between">
+<div>
+<div class="flex items-center gap-2 mb-4">
+<span class="w-2 h-2 rounded-full bg-error animate-pulse"></span>
+<span class="text-label-sm uppercase tracking-[0.2rem] text-error font-semibold">Active Incident</span>
+</div>
+<h1 class="text-display-md font-bold tracking-tight mb-2">Bridge Integrity Breach</h1>
+<p class="text-on-surface-variant max-w-xl">Structural instability detected via seismic sensors on Sector 7 Overpass. Evacuation protocols initiated for peripheral zones.</p>
+</div>
+<div class="mt-8 flex gap-4">
+<button class="px-6 py-2 bg-gradient-to-br from-tertiary to-tertiary-dim text-on-tertiary-fixed font-semibold rounded-lg flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="emergency">emergency</span>
+                        Deploy Response
+                    </button>
+<button class="px-6 py-2 bg-secondary-container text-on-secondary-container font-semibold rounded-lg">View Full Report</button>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant/15 rounded-xl p-6 flex flex-col justify-between">
+<div class="space-y-4">
+<div class="flex justify-between items-center">
+<span class="text-label-sm uppercase tracking-widest text-on-surface-variant">Global Status</span>
+<span class="material-symbols-outlined text-tertiary" data-icon="shield">shield</span>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-sm">
+<span class="text-on-surface-variant">System Load</span>
+<span>42%</span>
+</div>
+<div class="w-full bg-surface-container-high h-1 rounded-full overflow-hidden">
+<div class="bg-tertiary h-full w-[42%]"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-sm">
+<span class="text-on-surface-variant">Signal Integrity</span>
+<span>98.4%</span>
+</div>
+<div class="w-full bg-surface-container-high h-1 rounded-full overflow-hidden">
+<div class="bg-tertiary h-full w-[98%]"></div>
+</div>
+</div>
+</div>
+<div class="pt-6 border-t border-outline-variant/15">
+<span class="text-xs text-on-surface-variant">OPERATOR: 01 // STATION: ALPHA</span>
+</div>
+</div>
+</section>
+<!-- Feed Filters -->
+<section>
+<div class="flex items-center gap-4 overflow-x-auto pb-4 custom-scrollbar">
+<button class="flex-shrink-0 px-4 py-1.5 rounded-full bg-tertiary text-on-tertiary-container text-label-sm font-semibold tracking-widest uppercase">All Signals</button>
+<button class="flex-shrink-0 px-4 py-1.5 rounded-full bg-surface-container-high text-on-surface-variant text-label-sm font-semibold tracking-widest uppercase hover:bg-surface-bright transition-colors">Field Units</button>
+<button class="flex-shrink-0 px-4 py-1.5 rounded-full bg-surface-container-high text-on-surface-variant text-label-sm font-semibold tracking-widest uppercase hover:bg-surface-bright transition-colors">Social Intelligence</button>
+<button class="flex-shrink-0 px-4 py-1.5 rounded-full bg-surface-container-high text-on-surface-variant text-label-sm font-semibold tracking-widest uppercase hover:bg-surface-bright transition-colors">CCTV / Camera</button>
+<button class="flex-shrink-0 px-4 py-1.5 rounded-full bg-surface-container-high text-on-surface-variant text-label-sm font-semibold tracking-widest uppercase hover:bg-surface-bright transition-colors">Thermal Arrays</button>
+<button class="flex-shrink-0 px-4 py-1.5 rounded-full bg-surface-container-high text-on-surface-variant text-label-sm font-semibold tracking-widest uppercase hover:bg-surface-bright transition-colors">Sat-Comms</button>
+</div>
+</section>
+<!-- Signal Stream -->
+<section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+<!-- Signal Card 1 -->
+<article class="bg-surface-container-low border border-outline-variant/15 overflow-hidden group">
+<div class="h-48 bg-surface-container-lowest relative overflow-hidden">
+<img class="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" data-alt="Dark surveillance footage of a bridge with thermal heat maps" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAA2WlMEAeu-BRNVCI7t85LDtyTDcHlOKad_tCdCL04lfFss-pa8i8-vu1XE1wa7c33lb8GtNehVUzGT6aRF8mU2joevZrMWh3mkLDmib8wj4G3NLP1WfgoZVqLmBvAOQoG7RdR3xUU4CkZ73SrfogelFjqEu9xBLm1Y6yME1viaNpUrYdlA1jV-AtGulpqhU3cEraVC7YkDXjE1IdcBwUbJ8uv8kJWXkgOrGl_Z8aj8wVXdCuFrFOolLf0R9DsrENpEMJNl79Qvsra"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-low to-transparent"></div>
+<div class="absolute top-4 left-4 px-2 py-1 glass-panel text-[10px] font-bold tracking-widest uppercase text-error">LIVE // SECTOR 7</div>
+</div>
+<div class="p-6 space-y-4">
+<div class="flex justify-between items-start">
+<h3 class="text-title-sm font-semibold text-on-surface uppercase tracking-tight">Bridge Integrity Breach</h3>
+<span class="text-[10px] font-medium text-on-surface-variant">02:44m ago</span>
+</div>
+<p class="text-sm text-on-surface-variant leading-relaxed line-clamp-2">Seismic oscillation exceeded threshold at coordinate 40.7128° N, 74.0060° W. Visible fissures detected on support pillar B-4.</p>
+<div class="flex items-center justify-between pt-4 border-t border-outline-variant/15">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-tertiary" data-icon="verified" data-weight="fill" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant">Verified Signal</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex flex-col items-end">
+<span class="text-[9px] uppercase tracking-tighter text-on-surface-variant">AI Credibility</span>
+<div class="w-16 h-1 bg-surface-container-high rounded-full overflow-hidden mt-1">
+<div class="bg-tertiary h-full w-[94%]"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</article>
+<!-- Signal Card 2 -->
+<article class="bg-surface-container-low border border-outline-variant/15 overflow-hidden group">
+<div class="h-48 bg-surface-container-lowest relative overflow-hidden">
+<img class="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" data-alt="High angle shot of traffic congestion with digital tracking overlays" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAAln-XmCocfEbyD6LNxueGJkiY3C9162flPohQMFZ194vNYPUQR_mRddYsvOvDyGeNQh6dGv_u3YYRpz7ZNjPXncb-B4qoyEa9-IwdhH5pR9ixr-svrT7TNKfHyc54-Y2Ot8df3lIawmmd2u1d0kXDWtHdowPZfYx4cOpbZbprpCNtw0I72Tbs3TiJfMMPN9I3BRsZegA1p8u8UtGdSspv87l1zq1r6qyXjT2JciBoeMGNiS-06A6vDhw-5pTTETDp_oSheAHdJWR0"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-low to-transparent"></div>
+<div class="absolute top-4 left-4 px-2 py-1 glass-panel text-[10px] font-bold tracking-widest uppercase text-tertiary">SOCIAL // SCRAPE</div>
+</div>
+<div class="p-6 space-y-4">
+<div class="flex justify-between items-start">
+<h3 class="text-title-sm font-semibold text-on-surface uppercase tracking-tight">Mass Transit Delay</h3>
+<span class="text-[10px] font-medium text-on-surface-variant">08:12m ago</span>
+</div>
+<p class="text-sm text-on-surface-variant leading-relaxed line-clamp-2">Volume spike in keyword 'gridlock' and 'stationary' within 2km radius of incident center. 1,200 unique mentions.</p>
+<div class="flex items-center justify-between pt-4 border-t border-outline-variant/15">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-on-surface-variant" data-icon="emergency">emergency</span>
+<span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant">Citizen Intelligence</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex flex-col items-end">
+<span class="text-[9px] uppercase tracking-tighter text-on-surface-variant">AI Credibility</span>
+<div class="w-16 h-1 bg-surface-container-high rounded-full overflow-hidden mt-1">
+<div class="bg-error h-full w-[65%]"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</article>
+<!-- Signal Card 3 -->
+<article class="bg-surface-container-low border border-outline-variant/15 overflow-hidden group">
+<div class="h-48 bg-surface-container-lowest relative overflow-hidden">
+<img class="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" data-alt="Industrial sensor panel with multiple flickering red data points" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCNy0IZa9JoMAQC3KMKpPTdwzvxY6CxpsWNQTGq5CDPkveBozgumwb0-xnyEoYqex0_-yxl0wh64FFEdYCAHFDubmKMKlbLg3GqXu1G8sJ0JQEI1rxOL8TIZ2l1nVa1Q5QG7iVfH6-gtpF8vVCR_CzSZn2pfCvMt9MpfOEuOqPU_ls6d_5bZFMqm4LKo5bjnqeWyLpRF94cP-FPL4M1zTMPuJp1_UyKkPdEiM1vkkumo9C2BjgBLBJ7hhSlEr-0jHowq-RhXac4s5Ys"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-low to-transparent"></div>
+<div class="absolute top-4 left-4 px-2 py-1 glass-panel text-[10px] font-bold tracking-widest uppercase text-error">CRITICAL // GRID</div>
+</div>
+<div class="p-6 space-y-4">
+<div class="flex justify-between items-start">
+<h3 class="text-title-sm font-semibold text-on-surface uppercase tracking-tight">Power Substation 14-C</h3>
+<span class="text-[10px] font-medium text-on-surface-variant">14:02m ago</span>
+</div>
+<p class="text-sm text-on-surface-variant leading-relaxed line-clamp-2">Unexpected drop in voltage supply. Secondary backup systems failing to engage. Potential localized blackout imminent.</p>
+<div class="flex items-center justify-between pt-4 border-t border-outline-variant/15">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-tertiary" data-icon="verified" data-weight="fill" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant">Telemetry Validated</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex flex-col items-end">
+<span class="text-[9px] uppercase tracking-tighter text-on-surface-variant">AI Credibility</span>
+<div class="w-16 h-1 bg-surface-container-high rounded-full overflow-hidden mt-1">
+<div class="bg-tertiary h-full w-[99%]"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</article>
+<!-- Signal Card 4 -->
+<article class="bg-surface-container-low border border-outline-variant/15 overflow-hidden group">
+<div class="h-48 bg-surface-container-lowest relative overflow-hidden">
+<img class="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" data-alt="Night city street with blinking traffic lights and rainy reflections" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBdTXt_EVA-bg1npKIIxBNrHk4qmZu-TU-mJOx1LYchKNNcuypAGJe8T3XyCzHh_2xoy_QwF58pwbgn4WczzDygn2jP9UdF8Zk351sgufV4w7p9mXEV9Dh2a_FUE-4SLWFQJxUzKTN07GOQ_zJJWEweEpQaS-z47qGRazLgaKIUGWwiVyU3ZA66VZqR3xy_ULcqvICR2RW1E1u3w-kWdK_KCV58wicStfaWmeqZpsGDibEzfoyBW2uC87N9zBFlEwUkLuZ6YARDpQ2k"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-low to-transparent"></div>
+<div class="absolute top-4 left-4 px-2 py-1 glass-panel text-[10px] font-bold tracking-widest uppercase text-on-surface-variant">CAMERA // CAM-082</div>
+</div>
+<div class="p-6 space-y-4">
+<div class="flex justify-between items-start">
+<h3 class="text-title-sm font-semibold text-on-surface uppercase tracking-tight">Intersection 8 Clear</h3>
+<span class="text-[10px] font-medium text-on-surface-variant">19:44m ago</span>
+</div>
+<p class="text-sm text-on-surface-variant leading-relaxed line-clamp-2">Traffic flow at Intersection 8 remains stable. No unauthorized pedestrian movement detected in restricted zone.</p>
+<div class="flex items-center justify-between pt-4 border-t border-outline-variant/15">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-on-surface-variant" data-icon="visibility">visibility</span>
+<span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant">Passive Scan</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex flex-col items-end">
+<span class="text-[9px] uppercase tracking-tighter text-on-surface-variant">AI Credibility</span>
+<div class="w-16 h-1 bg-surface-container-high rounded-full overflow-hidden mt-1">
+<div class="bg-tertiary h-full w-[88%]"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</article>
+<!-- Signal Card 5 -->
+<article class="bg-surface-container-low border border-outline-variant/15 overflow-hidden group">
+<div class="h-48 bg-surface-container-lowest relative overflow-hidden">
+<img class="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" data-alt="Close up of digital map with glowing blue paths and red nodes" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAWWXCq52t0jx61S8AedBoM5YXXBi5Ciyg2Tvbj9MIF063PkOsIUTyhdF47-U_DnLk4xxqmcPMFzql_S4ENrO2loA2XzKZSqBCE9x9XVVeApPsX1PJ3WJsjHBM7xwxo7Cagd4BPHX85sBs_TfCcMXnijGmvz60jUtkU8EiyA2KFH00-iux8Vw2fCURcHwVOuUi9qqtKYK51ctJ5zpSjYfYGo-QEGOvI-GnRy4F2Pfm08L_0mH5abPfvZ5sO0BcrQiaiZeXrV2l3K_Qv"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-low to-transparent"></div>
+<div class="absolute top-4 left-4 px-2 py-1 glass-panel text-[10px] font-bold tracking-widest uppercase text-tertiary">NETWORK // D-NODES</div>
+</div>
+<div class="p-6 space-y-4">
+<div class="flex justify-between items-start">
+<h3 class="text-title-sm font-semibold text-on-surface uppercase tracking-tight">Data Packets Spike</h3>
+<span class="text-[10px] font-medium text-on-surface-variant">25:12m ago</span>
+</div>
+<p class="text-sm text-on-surface-variant leading-relaxed line-clamp-2">Encrypted communication bursts detected coming from the financial district. Anomaly doesn't match standard traffic profiles.</p>
+<div class="flex items-center justify-between pt-4 border-t border-outline-variant/15">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-on-surface-variant" data-icon="monitor_heart">monitor_heart</span>
+<span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant">Traffic Monitor</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex flex-col items-end">
+<span class="text-[9px] uppercase tracking-tighter text-on-surface-variant">AI Credibility</span>
+<div class="w-16 h-1 bg-surface-container-high rounded-full overflow-hidden mt-1">
+<div class="bg-error h-full w-[45%]"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</article>
+<!-- Signal Card 6 -->
+<article class="bg-surface-container-low border border-outline-variant/15 overflow-hidden group">
+<div class="h-48 bg-surface-container-lowest relative overflow-hidden flex items-center justify-center">
+<div class="text-center">
+<span class="material-symbols-outlined text-4xl text-outline-variant animate-pulse" data-icon="hourglass_empty">hourglass_empty</span>
+<p class="text-[10px] font-bold tracking-[0.3rem] uppercase text-outline-variant mt-2">Waiting for Feed...</p>
+</div>
+</div>
+<div class="p-6 opacity-30">
+<div class="h-4 w-3/4 bg-surface-container-high rounded mb-4"></div>
+<div class="h-2 w-full bg-surface-container-high rounded mb-2"></div>
+<div class="h-2 w-full bg-surface-container-high rounded"></div>
+</div>
+</article>
+</section>
+</main>
+<!-- Navigation Drawer (Placeholder/Side Navigation) -->
+<aside class="hidden lg:flex fixed inset-y-0 left-0 z-[60] flex flex-col p-6 w-14 bg-[#131313] border-r border-[#484848]/15 group hover:w-80 transition-all duration-300">
+<div class="flex flex-col gap-8 h-full">
+<div class="flex items-center gap-4 overflow-hidden">
+<div class="min-w-[24px] flex justify-center">
+<span class="material-symbols-outlined text-[#e7e5e4]" data-icon="shield">shield</span>
+</div>
+<span class="font-['Inter'] font-bold uppercase tracking-widest text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">Command Ops</span>
+</div>
+<nav class="flex flex-col gap-4 mt-8">
+<div class="flex items-center gap-4 p-2 rounded bg-[#1f2020] text-[#679cff] font-semibold">
+<div class="min-w-[24px] flex justify-center">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+</div>
+<span class="font-['Inter'] font-medium text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">System Configuration</span>
+</div>
+<div class="flex items-center gap-4 p-2 rounded text-[#e7e5e4]/60 hover:text-[#e7e5e4] hover:bg-[#1f2020] transition-all">
+<div class="min-w-[24px] flex justify-center">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+</div>
+<span class="font-['Inter'] font-medium text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">Deployment Logs</span>
+</div>
+<div class="flex items-center gap-4 p-2 rounded text-[#e7e5e4]/60 hover:text-[#e7e5e4] hover:bg-[#1f2020] transition-all">
+<div class="min-w-[24px] flex justify-center">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+</div>
+<span class="font-['Inter'] font-medium text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">Personnel Directory</span>
+</div>
+<div class="flex items-center gap-4 p-2 rounded text-[#e7e5e4]/60 hover:text-[#e7e5e4] hover:bg-[#1f2020] transition-all">
+<div class="min-w-[24px] flex justify-center">
+<span class="material-symbols-outlined" data-icon="verified_user">verified_user</span>
+</div>
+<span class="font-['Inter'] font-medium text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">Security Protocols</span>
+</div>
+</nav>
+<div class="mt-auto pt-6 border-t border-[#484848]/15 flex items-center gap-4 overflow-hidden">
+<div class="min-w-[32px] h-32px rounded bg-tertiary/20 flex items-center justify-center">
+<img class="w-8 h-8 rounded object-cover" data-alt="User Dispatch Avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC_pdmNN772TfzHf--PVzgwwkPzJIaqPZdphv9_Lw4FwWGy3LefysAI-VeXkKh4KScuhSVmRyOIWXX6s9v261uQz0G49lYCGoKsJEylfCJCmvHtjlayohi2rc5T7ov2mcESjVqf4Md50UH7aL77oA2aJQrOuHKSzvWyaZkiQGAPltoT5Kp03eD3TGzGk4nOMxY0N3lrgTdEbtq-2Ovcc7kHkgkbqhAgBhcqgr7w7ghoWxZWu08U30XfMX0QUfx3EyBFDdM_9zGOsbPG"/>
+</div>
+<div class="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+<span class="text-sm font-semibold text-[#e7e5e4]">Operator 01</span>
+<span class="text-[10px] text-[#acabaa]">Lead Coordinator</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- BottomNavBar -->
+<footer class="fixed bottom-0 left-0 w-full flex justify-around items-center h-16 pb-safe bg-[#0e0e0e]/80 backdrop-blur-xl border-t border-[#484848]/15 z-50 md:hidden">
+<div class="flex flex-col items-center justify-center text-[#484848] hover:text-[#e7e5e4] transition-colors">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#679cff] scale-110 transition-transform">
+<span class="material-symbols-outlined" data-icon="activity">search_activity</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#484848] hover:text-[#e7e5e4] transition-colors">
+<span class="material-symbols-outlined" data-icon="explore">explore</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#484848] hover:text-[#e7e5e4] transition-colors">
+<span class="material-symbols-outlined" data-icon="shield">shield</span>
+</div>
+</footer>
+</body></html>

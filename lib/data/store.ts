@@ -32,6 +32,7 @@ export interface SignalCard {
   time: string;
   icon: string;
   empty?: boolean;
+  incidentId?: string;
 }
 
 export interface ActivityEntry {
@@ -55,8 +56,21 @@ export interface AIRecommendation {
   ctaLabel: string;
 }
 
+export interface ActiveIncident {
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  severity: number;
+  status: string;
+  location: string;
+  sources: string[];
+  createdAt: string;
+}
+
 export interface DashboardData {
   stats: DashboardStats;
+  activeIncident: ActiveIncident | null;
   signals: SignalCard[];
   activity: ActivityEntry[];
   protocolSteps: ProtocolStep[];
@@ -82,12 +96,18 @@ export const activity: ActivityEntry[] = [];
 
 export const protocolSteps: ProtocolStep[] = [];
 
+export let activeIncident: ActiveIncident | null = null;
+
 export const aiRecommendation: AIRecommendation = {
   actionSequence: '',
   confidenceScore: 0,
   stats: [],
   ctaLabel: 'Approve Dispatch',
 };
+
+export function setActiveIncident(incident: ActiveIncident | null) {
+  activeIncident = incident;
+}
 
 // ---------------------------------------------------------------------------
 // Mutation functions — called by AI agent routes
@@ -152,6 +172,7 @@ export function updateRecommendation(rec: Partial<AIRecommendation>) {
 export function getDashboardData(): DashboardData {
   return {
     stats,
+    activeIncident,
     signals,
     activity,
     protocolSteps,
@@ -198,6 +219,41 @@ export async function syncDashboardFromDb(): Promise<DashboardData> {
       signalHealthPct: activeIncidents.length > 0 || recentSignals.length > 0 ? 98 : 0,
     });
 
+    // Set the primary active incident — prefer one with AI analysis, else highest severity
+    if (activeIncidents.length > 0) {
+      const withAnalysis = activeIncidents.find((i) => i.aiAnalysis != null);
+      const bySeverity = [...activeIncidents].sort((a, b) => b.severity - a.severity);
+      const top = withAnalysis ?? bySeverity[0];
+
+      setActiveIncident({
+        id: top.id,
+        title: top.title,
+        description: top.description ?? `${top.type} incident — severity ${top.severity}`,
+        type: top.type,
+        severity: top.severity,
+        status: top.status,
+        location: top.location?.description ?? top.location?.address ?? '',
+        sources: top.sources ?? [],
+        createdAt: top.createdAt,
+      });
+
+      // Reconstruct recommendation and protocol from ai_analysis JSONB
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const analysis = top.aiAnalysis as any;
+      if (analysis?.recommendation) {
+        const rec = analysis.recommendation;
+        updateRecommendation({
+          actionSequence: rec.actionSequence ?? '',
+          confidenceScore: rec.confidenceScore ?? 0,
+          stats: rec.stats ?? [],
+          ctaLabel: rec.ctaLabel ?? 'Approve Dispatch',
+        });
+      }
+      if (analysis?.protocolSteps && Array.isArray(analysis.protocolSteps)) {
+        setProtocolSteps(analysis.protocolSteps);
+      }
+    }
+
     // Build signal cards from ALL DB sources: incidents, social signals, camera alerts
     const dbSignals: SignalCard[] = [];
     let dbSigCount = 0;
@@ -223,6 +279,7 @@ export async function syncDashboardFromDb(): Promise<DashboardData> {
         credibilityColor: inc.severity >= 4 ? 'bg-tertiary' : inc.severity >= 3 ? 'bg-tertiary' : 'bg-warning',
         time: timeSince(inc.createdAt),
         icon: incidentIconMap[inc.type] ?? 'sensors',
+        incidentId: inc.id,
       });
     }
 
