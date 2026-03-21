@@ -506,3 +506,125 @@ export async function dbGetTelegramSubscribersForIncident(
   }
   return result;
 }
+
+// ---------------------------------------------------------------------------
+// Resource Requests
+// ---------------------------------------------------------------------------
+
+export interface ResourceRequest {
+  id: string;
+  incidentId: string | null;
+  resourceType: string;
+  quantity: number;
+  priority: 'immediate' | 'urgent' | 'standard';
+  description: string | null;
+  status: string;
+  requestedBy: string;
+  approvedBy: string | null;
+  deniedReason: string | null;
+  approvedAt: string | null;
+  dispatchedAt: string | null;
+  fulfilledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Joined fields
+  incidentTitle?: string;
+}
+
+function rowToResourceRequest(row: any): ResourceRequest {
+  return {
+    id: row.id,
+    incidentId: row.incident_id ?? null,
+    resourceType: row.resource_type,
+    quantity: row.quantity,
+    priority: row.priority,
+    description: row.description ?? null,
+    status: row.status,
+    requestedBy: row.requested_by,
+    approvedBy: row.approved_by ?? null,
+    deniedReason: row.denied_reason ?? null,
+    approvedAt: row.approved_at ?? null,
+    dispatchedAt: row.dispatched_at ?? null,
+    fulfilledAt: row.fulfilled_at ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    incidentTitle: row.incident_title ?? row.incidents?.title ?? undefined,
+  };
+}
+
+export async function dbInsertResourceRequest(data: {
+  incidentId?: string;
+  resourceType: string;
+  quantity?: number;
+  priority: 'immediate' | 'urgent' | 'standard';
+  description?: string;
+  requestedBy?: string;
+}): Promise<ResourceRequest> {
+  const row = {
+    incident_id: data.incidentId ?? null,
+    resource_type: data.resourceType,
+    quantity: data.quantity ?? 1,
+    priority: data.priority,
+    description: data.description ?? null,
+    requested_by: data.requestedBy ?? 'AI Agent',
+  };
+  const { data: inserted, error } = await supabase
+    .from('resource_requests').insert(row).select().single();
+  if (error) throw new Error(`dbInsertResourceRequest failed: ${error.message}`);
+  return rowToResourceRequest(inserted);
+}
+
+export async function dbListResourceRequests(filters?: {
+  status?: string | string[];
+  incidentId?: string;
+  priority?: string;
+  limit?: number;
+}): Promise<ResourceRequest[]> {
+  let query = supabase
+    .from('resource_requests')
+    .select('*, incidents(title)')
+    .order('created_at', { ascending: false });
+  if (filters?.status) {
+    if (Array.isArray(filters.status)) {
+      query = query.in('status', filters.status);
+    } else {
+      query = query.eq('status', filters.status);
+    }
+  }
+  if (filters?.incidentId) query = query.eq('incident_id', filters.incidentId);
+  if (filters?.priority) query = query.eq('priority', filters.priority);
+  if (filters?.limit) query = query.limit(filters.limit);
+  const { data: rows, error } = await query;
+  if (error) throw new Error(`dbListResourceRequests failed: ${error.message}`);
+  return (rows ?? []).map((r: any) => ({
+    ...rowToResourceRequest(r),
+    incidentTitle: r.incidents?.title ?? undefined,
+  }));
+}
+
+export async function dbUpdateResourceRequest(
+  id: string,
+  data: {
+    status?: string;
+    approvedBy?: string;
+    deniedReason?: string;
+    approvedAt?: string;
+    dispatchedAt?: string;
+    fulfilledAt?: string;
+  },
+): Promise<ResourceRequest | null> {
+  const row: Record<string, unknown> = {};
+  if (data.status !== undefined) row.status = data.status;
+  if (data.approvedBy !== undefined) row.approved_by = data.approvedBy;
+  if (data.deniedReason !== undefined) row.denied_reason = data.deniedReason;
+  if (data.approvedAt !== undefined) row.approved_at = data.approvedAt;
+  if (data.dispatchedAt !== undefined) row.dispatched_at = data.dispatchedAt;
+  if (data.fulfilledAt !== undefined) row.fulfilled_at = data.fulfilledAt;
+  const { data: updated, error } = await supabase
+    .from('resource_requests').update(row).eq('id', id).select().single();
+  if (error) {
+    if (error.code === 'PGRST116') return null;
+    throw new Error(`dbUpdateResourceRequest failed: ${error.message}`);
+  }
+  return updated ? rowToResourceRequest(updated) : null;
+}
