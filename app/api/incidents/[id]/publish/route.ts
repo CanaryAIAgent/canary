@@ -1,10 +1,8 @@
 /**
- * Canary — Publish Incident as Public Status Page
+ * Canary — Publish / Unpublish Incident Public Status Page
  *
- * POST /api/incidents/[id]/publish
- *
- * Generates a public-facing summary via AI and stores it in
- * incidents.ai_analysis.publicSummary. Returns the public URL.
+ * POST /api/incidents/[id]/publish   — generate & store public summary
+ * DELETE /api/incidents/[id]/publish — remove public summary
  */
 
 import { NextRequest } from 'next/server';
@@ -77,6 +75,41 @@ Incident:
     console.error('[api/incidents/[id]/publish] Error:', err);
     return Response.json(
       { error: 'Failed to publish incident' },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  ctx: RouteContext<'/api/incidents/[id]/publish'>,
+) {
+  const { id } = await ctx.params;
+
+  try {
+    const incident = await dbGetIncident(id);
+
+    if (!incident) {
+      return Response.json(
+        { error: 'Incident not found' },
+        { status: 404 },
+      );
+    }
+
+    // Remove publicSummary from ai_analysis
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const existing = (incident.aiAnalysis ?? {}) as any;
+    const { publicSummary: _, ...rest } = existing;
+    await dbUpdateIncident(id, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      aiAnalysis: rest as any,
+    });
+
+    return Response.json({ success: true });
+  } catch (err) {
+    console.error('[api/incidents/[id]/publish] DELETE error:', err);
+    return Response.json(
+      { error: 'Failed to unpublish incident' },
       { status: 500 },
     );
   }

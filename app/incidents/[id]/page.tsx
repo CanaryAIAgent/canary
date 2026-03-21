@@ -136,6 +136,11 @@ export default function IncidentDetailPage() {
         const json = await res.json();
         setIncident(json.incident);
         setAgentLogs(json.agentLogs ?? []);
+        // Detect if already published
+        const ai = json.incident?.aiAnalysis as Record<string, unknown> | undefined;
+        if (ai?.publicSummary) {
+          setPublicUrl(`/status/${incidentId}`);
+        }
         setError(false);
       } catch {
         setError(true);
@@ -163,6 +168,25 @@ export default function IncidentDetailPage() {
       }
     } catch {
       console.error("[publish] failed");
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  // Unpublish handler
+  const handleUnpublish = async () => {
+    if (!incidentId || publishing) return;
+    setPublishing(true);
+    try {
+      const res = await fetch(`/api/incidents/${incidentId}/publish`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (json.success) {
+        setPublicUrl(null);
+      }
+    } catch {
+      console.error("[unpublish] failed");
     } finally {
       setPublishing(false);
     }
@@ -334,41 +358,53 @@ export default function IncidentDetailPage() {
 
             {/* Actions */}
             <div className="flex flex-wrap gap-3 mt-6">
-              <button
-                onClick={handlePublish}
-                disabled={publishing}
-                className="bg-tertiary-gradient px-5 py-2 rounded-lg text-white font-semibold text-sm flex items-center gap-2 hover:opacity-90 transition-opacity active:scale-95 disabled:opacity-40"
-              >
-                {publishing ? (
-                  <>
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Publishing…
-                  </>
-                ) : (
-                  <>
-                    <span className="material-symbols-outlined text-[16px]">
-                      public
-                    </span>
-                    Create Public Status Page
-                  </>
-                )}
-              </button>
+              {publicUrl ? (
+                <>
+                  <Link
+                    href={publicUrl}
+                    className="bg-tertiary-gradient px-5 py-2 rounded-lg text-white font-semibold text-sm flex items-center gap-2 hover:opacity-90 transition-opacity active:scale-95"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                    View Public Status Page
+                  </Link>
+                  <button
+                    onClick={handleUnpublish}
+                    disabled={publishing}
+                    className="px-5 py-2 bg-error/15 text-error font-semibold text-sm rounded-lg flex items-center gap-2 hover:bg-error/25 transition-colors active:scale-95 disabled:opacity-40"
+                  >
+                    {publishing ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-error/30 border-t-error rounded-full animate-spin" />
+                        Removing…
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                        Remove Public Page
+                      </>
+                    )}
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={handlePublish}
+                  disabled={publishing}
+                  className="bg-tertiary-gradient px-5 py-2 rounded-lg text-white font-semibold text-sm flex items-center gap-2 hover:opacity-90 transition-opacity active:scale-95 disabled:opacity-40"
+                >
+                  {publishing ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Publishing…
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[16px]">public</span>
+                      Create Public Status Page
+                    </>
+                  )}
+                </button>
+              )}
             </div>
-
-            {/* Published URL */}
-            {publicUrl && (
-              <div className="mt-4 p-3 bg-tertiary/10 rounded-lg flex items-center gap-2">
-                <span className="material-symbols-outlined text-tertiary text-[16px]">
-                  check_circle
-                </span>
-                <span className="text-xs text-tertiary font-semibold">
-                  Published:
-                </span>
-                <span className="text-xs text-on-surface font-mono">
-                  {publicUrl}
-                </span>
-              </div>
-            )}
           </div>
         </section>
 
