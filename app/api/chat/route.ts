@@ -28,7 +28,7 @@ import {
   setProtocolSteps,
   getDashboardData,
 } from '@/lib/data/store';
-import { dbInsertIncident, dbInsertAgentLog } from '@/lib/db';
+import { supabase } from '@/lib/db';
 
 export const maxDuration = 60;
 
@@ -111,19 +111,26 @@ export async function POST(req: Request) {
               ? (incidentType as typeof validTypes[number])
               : 'other' as const;
 
-            const incident = await dbInsertIncident({
-              title,
-              description: desc,
-              type: iType,
-              severity: Math.round(Math.min(5, Math.max(1, severity))),
-              status: 'new',
-              location: {},
-              sources: ['field'],
-              mediaUrls: [],
-              corroboratedBySignals: [],
-              linkedCameraAlerts: [],
-            });
-            incidentId = incident.id;
+            const { data: incident, error } = await supabase
+              .from('incidents')
+              .insert({
+                title,
+                description: desc,
+                type: iType,
+                severity: Math.round(Math.min(5, Math.max(1, severity))),
+                status: 'new',
+                location: {},
+                sources: ['field'],
+                media_urls: [],
+                corroborated_by_signals: [],
+                linked_camera_alerts: [],
+              })
+              .select()
+              .single();
+
+            if (!error && incident) {
+              incidentId = incident.id;
+            }
           } catch (err) {
             console.error('[chat/pushSignal] DB persist failed:', err);
           }
