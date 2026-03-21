@@ -352,6 +352,10 @@ export default function Dashboard() {
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Model tier state
+  const [modelTier, setModelTier] = useState<"flash" | "pro" | "pro3">("flash");
+  const [photoModel, setPhotoModel] = useState<"flash" | "nano-banana">("flash");
+
   const refreshDashboard = useCallback(() => {
     fetch("/api/dashboard")
       .then((r) => r.json())
@@ -360,7 +364,10 @@ export default function Dashboard() {
   }, []);
 
   const { messages: chatMessages, sendMessage, status: chatStatus } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/chat" }),
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      body: { modelTier },
+    }),
     onFinish: () => {
       refreshDashboard();
     },
@@ -424,6 +431,8 @@ export default function Dashboard() {
 
     const formData = new FormData();
     uploadedFiles.forEach((f) => formData.append("images", f));
+
+    formData.append("model", photoModel);
 
     if (createMode) {
       formData.append("title", newTitle);
@@ -1345,6 +1354,38 @@ export default function Dashboard() {
                     )}
                   </div>
 
+                  {/* AI Model Selector */}
+                  <div className="bg-surface-container-low border border-outline-variant/15 rounded-xl p-6 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-tertiary/10 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-tertiary text-[18px]">model_training</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-on-surface">AI Model</p>
+                        <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Select analysis engine</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {([
+                        { key: "flash" as const, label: "Gemini Flash", desc: "Standard analysis" },
+                        { key: "nano-banana" as const, label: "Nano Banana 2", desc: "Advanced image AI" },
+                      ]).map((m) => (
+                        <button
+                          key={m.key}
+                          onClick={() => setPhotoModel(m.key)}
+                          className={`flex-1 flex flex-col items-center gap-1 px-3 py-3 rounded-lg text-xs font-semibold transition-colors ${
+                            photoModel === m.key
+                              ? "bg-tertiary/15 text-tertiary"
+                              : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-bright"
+                          }`}
+                        >
+                          <span>{m.label}</span>
+                          <span className="text-[9px] font-normal opacity-70">{m.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Image Upload Area */}
                   <div className="bg-surface-container-low border border-outline-variant/15 rounded-xl p-6 space-y-5">
                     <div className="flex items-center gap-3 mb-2">
@@ -1508,13 +1549,25 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
-            <button
-              onClick={() => setChatOpen(false)}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest transition-colors"
-              aria-label="Close chat"
-            >
-              <span className="material-symbols-outlined text-[18px]">close</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Model tier selector */}
+              <select
+                value={modelTier}
+                onChange={(e) => setModelTier(e.target.value as "flash" | "pro" | "pro3")}
+                className="bg-surface-container-lowest border border-outline-variant/15 rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant outline-none appearance-none cursor-pointer hover:border-outline-variant/30 transition-colors"
+              >
+                <option value="flash">Flash</option>
+                <option value="pro">Pro</option>
+                <option value="pro3">3.1 Pro</option>
+              </select>
+              <button
+                onClick={() => setChatOpen(false)}
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest transition-colors"
+                aria-label="Close chat"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
           </div>
 
           {/* Chat messages */}

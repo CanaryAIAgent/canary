@@ -9,7 +9,7 @@
  */
 
 import { generateObject } from 'ai';
-import { getFlashModel } from '@/lib/ai/config';
+import { getPhotoModel, type PhotoModel } from '@/lib/ai/config';
 import {
   dbInsertIncident,
   dbGetIncident,
@@ -33,6 +33,7 @@ export async function POST(request: Request) {
     const severityRaw = formData.get('severity');
     const severity = severityRaw ? Number(severityRaw) : undefined;
     const location = formData.get('location') as string | null;
+    const photoModelId = (formData.get('model') as PhotoModel | null) || 'flash';
 
     // Collect image files
     const images = formData.getAll('images') as File[];
@@ -85,7 +86,7 @@ export async function POST(request: Request) {
 
     // Run AI analysis
     const { object: analysis } = await generateObject({
-      model: getFlashModel(),
+      model: getPhotoModel(photoModelId),
       schema: PhotoAnalysisResponseSchema,
       messages: [
         {

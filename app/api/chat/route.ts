@@ -11,7 +11,7 @@
 
 import { streamText, UIMessage, convertToModelMessages, tool, stepCountIs } from 'ai';
 import { z } from 'zod';
-import { getFlashModel } from '@/lib/ai/config';
+import { getModel, type ModelTier } from '@/lib/ai/config';
 import {
   checkShelterCapacityTool,
   createIncidentTool,
@@ -70,13 +70,13 @@ You can push updates to the live dashboard using these tools:
 Current dashboard state will be provided. Use it to inform your responses and avoid duplicate entries.`;
 
 export async function POST(req: Request) {
-  const { messages }: { messages: UIMessage[] } = await req.json();
+  const { messages, modelTier }: { messages: UIMessage[]; modelTier?: ModelTier } = await req.json();
 
   // Include current dashboard state as context
   const dashboardState = getDashboardData();
 
   const result = streamText({
-    model: getFlashModel(),
+    model: getModel(modelTier ?? 'flash'),
     system: EOC_SYSTEM_PROMPT + `\n\n## Current Dashboard State\n${JSON.stringify(dashboardState, null, 2)}`,
     messages: await convertToModelMessages(messages),
     stopWhen: stepCountIs(10),
