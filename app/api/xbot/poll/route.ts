@@ -18,8 +18,9 @@ import {
   getAuthorHandle,
 } from '@/lib/integrations/xapi';
 import { handleXMention } from '@/lib/agents/xbot-handler';
+import { correlateXMentionToIncident } from '@/lib/agents/xbot-correlation';
 import { XMentionSchema, type XMention } from '@/lib/schemas';
-import { supabase } from '@/lib/db';
+import { supabase, dbGetIncident, dbUpdateIncident } from '@/lib/db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -374,6 +375,36 @@ async function processMention(
     const handlerResult = await handleXMention(validatedMention);
     console.log(`[xbot-poll] AI handler result for ${tweetId}:`, handlerResult);
 
+    // 6b. Correlate to incident
+    const correlation = await correlateXMentionToIncident(validatedMention, confidence);
+    let finalIncidentId: string | null = null;
+
+    if (correlation.matchedIncidentId) {
+      // Link to existing incident
+      finalIncidentId = correlation.matchedIncidentId;
+      console.log(
+        `[xbot-poll] Linked ${tweetId} to incident ${finalIncidentId} (score: ${correlation.similarityScore?.toFixed(3)})`
+      );
+
+      // Update incident's corroboratedBySignals array
+      const incident = await dbGetIncident(finalIncidentId);
+      if (incident) {
+        await dbUpdateIncident(finalIncidentId, {
+          corroboratedBySignals: [...incident.corroboratedBySignals, tweetId],
+        });
+        console.log(
+          `[xbot-poll] Updated incident ${finalIncidentId} with corroborating signal ${tweetId}`
+        );
+      }
+    } else if (correlation.shouldCreateIncident && confidence === 'confirmed') {
+      // Should create new incident
+      console.log(
+        `[xbot-poll] Should create new incident for ${tweetId} (no matching incidents found)`
+      );
+      // TODO: Implement incident creation from mention
+      // For now, incident_id will remain null
+    }
+
     // 7. Reply with AI handler response (skip if we already replied above for potential)
     if (confidence === 'confirmed') {
       await postReply(client, tweetId, handlerResult.reply);
@@ -391,7 +422,7 @@ async function processMention(
       has_location: hasLocation,
       confidence,
       ai_response: handlerResult.reply,
-      incident_id: handlerResult.shouldCreateIncident ? null : null, // TODO: link to incident when created
+      incident_id: finalIncidentId, // Now uses correlated incident ID
     });
 
     if (dbError) {
