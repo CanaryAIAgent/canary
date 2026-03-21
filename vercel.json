@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/xbot/poll?action=check",
+      "schedule": "* * * * *"
+    }
+  ]
+}
