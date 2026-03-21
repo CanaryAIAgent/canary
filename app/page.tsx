@@ -1155,47 +1155,53 @@ export default function Dashboard() {
                         )}
                       </div>
 
-                      {/* CTA buttons */}
-                      <button
-                        onClick={async () => {
-                          if (!incident) return;
-                          try {
-                            const res = await fetch("/api/dashboard/approve", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ incidentId: incident.id }),
-                            });
-                            const result = await res.json();
-                            if (result.success) {
-                              // Refresh dashboard to show updated status
-                              refreshDashboard();
+                      {/* CTA buttons — different state when already dispatched */}
+                      {incident?.status === "responding" ? (
+                        <div className="w-full py-3.5 rounded-xl bg-tertiary/15 text-tertiary font-bold text-sm tracking-widest uppercase flex items-center justify-center gap-3">
+                          <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                          Dispatched — Responding
+                        </div>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            if (!incident) return;
+                            try {
+                              const res = await fetch("/api/dashboard/approve", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ incidentId: incident.id }),
+                              });
+                              const result = await res.json();
+                              if (result.success) {
+                                refreshDashboard();
+                              }
+                            } catch {
+                              console.error("[approve] failed");
                             }
-                          } catch {
-                            console.error("[approve] failed");
-                          }
-                        }}
-                        className="w-full py-3.5 rounded-xl bg-tertiary-gradient text-white font-bold text-sm tracking-widest uppercase shadow-lg shadow-tertiary/20 hover:opacity-90 transition-all flex items-center justify-center gap-3 active:scale-95 duration-100"
-                        aria-label="Approve resource dispatch"
-                      >
-                        {aiRec.ctaLabel ?? "Approve Dispatch"}
-                      </button>
-                      <button
-                        onClick={() => {
-                          // Clear locally immediately
-                          if (data) {
-                            setData({
-                              ...data,
-                              aiRecommendation: { actionSequence: "", confidenceScore: 0, stats: [], ctaLabel: "Approve Dispatch" },
-                            });
-                          }
-                          // Persist dismissal to Supabase so it doesn't come back on next poll
-                          fetch("/api/dashboard/dismiss", { method: "POST" }).catch(() => {});
-                        }}
-                        className="w-full mt-3 py-2.5 rounded-xl bg-surface-container-highest text-on-surface-variant font-semibold text-xs tracking-widest uppercase hover:text-on-surface transition-colors"
-                        aria-label="Dismiss recommendation and override manually"
-                      >
-                        Dismiss &amp; Manual Override
-                      </button>
+                          }}
+                          className="w-full py-3.5 rounded-xl bg-tertiary-gradient text-white font-bold text-sm tracking-widest uppercase shadow-lg shadow-tertiary/20 hover:opacity-90 transition-all flex items-center justify-center gap-3 active:scale-95 duration-100"
+                          aria-label="Approve resource dispatch"
+                        >
+                          {aiRec.ctaLabel ?? "Approve Dispatch"}
+                        </button>
+                      )}
+                      {incident?.status !== "responding" && (
+                        <button
+                          onClick={() => {
+                            if (data) {
+                              setData({
+                                ...data,
+                                aiRecommendation: { actionSequence: "", confidenceScore: 0, stats: [], ctaLabel: "Approve Dispatch" },
+                              });
+                            }
+                            fetch("/api/dashboard/dismiss", { method: "POST" }).catch(() => {});
+                          }}
+                          className="w-full mt-3 py-2.5 rounded-xl bg-surface-container-highest text-on-surface-variant font-semibold text-xs tracking-widest uppercase hover:text-on-surface transition-colors"
+                          aria-label="Dismiss recommendation and override manually"
+                        >
+                          Dismiss &amp; Manual Override
+                        </button>
+                      )}
                     </>
                   )}
                 </div>
