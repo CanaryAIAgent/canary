@@ -145,7 +145,7 @@ export default function IncidentDetailPage() {
   const [resourceModalOpen, setResourceModalOpen] = useState(false);
   const [resourceType, setResourceType] = useState("medical_team");
   const [resourceQty, setResourceQty] = useState(1);
-  const [resourcePriority, setResourcePriority] = useState("high");
+  const [resourcePriority, setResourcePriority] = useState("urgent");
   const [resourceNotes, setResourceNotes] = useState("");
   const [resourceSubmitting, setResourceSubmitting] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -597,10 +597,9 @@ export default function IncidentDetailPage() {
                       onChange={(e) => setResourcePriority(e.target.value)}
                       className="w-full bg-surface-container-lowest border border-outline-variant/15 rounded-lg px-3 py-2 text-sm text-on-surface outline-none focus:border-tertiary transition-colors"
                     >
-                      <option value="critical">Critical</option>
-                      <option value="high">High</option>
-                      <option value="medium">Medium</option>
-                      <option value="low">Low</option>
+                      <option value="immediate">Immediate</option>
+                      <option value="urgent">Urgent</option>
+                      <option value="standard">Standard</option>
                     </select>
                   </div>
                 </div>
