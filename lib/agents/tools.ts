@@ -20,13 +20,6 @@ import {
   type Incident,
   type AgentLog,
 } from '@/lib/schemas';
-import {
-  dbInsertIncident,
-  dbGetIncident,
-  dbUpdateIncident,
-  dbInsertAgentLog,
-  dbGetRunbook,
-} from '@/lib/db';
 import { sendAlert, sendMessage, broadcastAlert, subscribedChats } from '@/lib/integrations/telegram';
 
 // ---------------------------------------------------------------------------

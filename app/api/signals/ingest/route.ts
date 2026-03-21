@@ -133,7 +133,7 @@ Choose an appropriate Material Symbols icon name (e.g. "apartment" for structura
         title: analysis.title,
         severity: analysis.severity,
         summary: analysis.summary,
-        location: analysis.extractedLocation,
+        location: analysis.extractedLocation ?? undefined,
         source: parsed.data.source ?? parsed.data.type,
       }).catch((err) => console.error('[signals/ingest] telegram broadcast error', err));
     }
