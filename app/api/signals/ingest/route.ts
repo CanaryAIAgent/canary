@@ -8,6 +8,7 @@
  * and push results to the live dashboard.
  */
 
+import { after } from 'next/server';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { getFlashModel } from '@/lib/ai/config';
@@ -123,9 +124,9 @@ Choose an appropriate Material Symbols icon name (e.g. "apartment" for structura
           `Created incident ${incident.id} from ${parsed.data.type} signal`,
         );
 
-        // Fire-and-forget: push Telegram alerts to matching subscribers
+        // Push Telegram alerts after the response is sent
         if (process.env.TELEGRAM_BOT_TOKEN) {
-          notifyTelegramSubscribers({
+          const alertData = {
             id: incident.id,
             title: incident.title,
             type: incident.type,
@@ -134,9 +135,14 @@ Choose an appropriate Material Symbols icon name (e.g. "apartment" for structura
             description: incident.description,
             locationDescription: incident.location?.description,
             locationZipCode: incident.location?.zipCode,
-          }).catch((err) =>
-            console.error('[signals/ingest] Telegram notify failed (non-fatal):', err),
-          );
+          };
+          after(async () => {
+            try {
+              await notifyTelegramSubscribers(alertData);
+            } catch (err) {
+              console.error('[signals/ingest] Telegram notify failed (non-fatal):', err);
+            }
+          });
         }
       } catch (dbErr) {
         console.error('[signals/ingest] DB persist failed (non-fatal):', dbErr);
