@@ -8,6 +8,7 @@
  */
 
 import { dbListIncidents, dbUpdateIncident, dbInsertAgentLog } from '@/lib/db';
+import { addActivity } from '@/lib/data/store';
 
 export async function POST(req: Request) {
   try {
@@ -52,6 +53,9 @@ export async function POST(req: Request) {
       actionsEscalated: [],
       timestamp: new Date().toISOString(),
     });
+
+    // Update in-memory activity feed so it shows immediately
+    addActivity('Incident Commander', `Approved dispatch for "${target.title}" — status → responding`);
 
     return Response.json({
       success: true,

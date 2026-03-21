@@ -6,6 +6,7 @@
  */
 
 import { dbListIncidents, dbUpdateIncident } from '@/lib/db';
+import { addActivity } from '@/lib/data/store';
 
 export async function POST() {
   try {
@@ -30,6 +31,9 @@ export async function POST() {
         aiAnalysis: { ...existing, dismissedAt: new Date().toISOString() } as any,
       });
     }
+
+    // Update in-memory activity feed so it shows immediately
+    addActivity('Incident Commander', `Acknowledged and dismissed AI recommendation${target ? ` for "${target.title}"` : ''}`);
 
     return Response.json({ success: true });
   } catch (error) {

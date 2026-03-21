@@ -1046,7 +1046,7 @@ export default function Dashboard() {
                           <p className="text-xs text-on-surface/80">
                             <span className="font-bold text-on-surface">{entry.actor}:</span>{" "}
                             {entry.action}{" "}
-                            <span className="text-on-surface-variant font-mono">{entry.time}m ago</span>
+                            <span className="text-on-surface-variant font-mono">{entry.time === "0m" ? "just now" : `${entry.time} ago`}</span>
                           </p>
                         </div>
                       ))
@@ -1740,6 +1740,16 @@ export default function Dashboard() {
                   parts.unshift({ type: "text", text: `Analyze ${chatFiles.length} uploaded photo(s) for incident damage assessment.` });
                 }
               }
+
+              // Log user message as activity
+              const activityText = chatInput.trim()
+                ? chatInput.trim().slice(0, 120)
+                : `Uploaded ${chatFiles.length} photo(s) for analysis`;
+              fetch("/api/dashboard/activity", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ actor: "Operator", action: activityText }),
+              }).catch(() => {});
 
               sendMessage({ role: "user", parts } as Parameters<typeof sendMessage>[0]);
               setChatInput("");
