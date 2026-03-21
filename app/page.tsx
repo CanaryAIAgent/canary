@@ -821,13 +821,15 @@ export default function Dashboard() {
                       </button>
                       <button
                         onClick={() => {
-                          // Clear recommendation locally and refresh
-                          fetch("/api/dashboard").then((r) => r.json()).then((d) => {
+                          // Clear locally immediately
+                          if (data) {
                             setData({
-                              ...d,
+                              ...data,
                               aiRecommendation: { actionSequence: "", confidenceScore: 0, stats: [], ctaLabel: "Approve Dispatch" },
                             });
-                          });
+                          }
+                          // Persist dismissal to Supabase so it doesn't come back on next poll
+                          fetch("/api/dashboard/dismiss", { method: "POST" }).catch(() => {});
                         }}
                         className="w-full mt-3 py-2.5 rounded-xl bg-surface-container-highest text-on-surface-variant font-semibold text-xs tracking-widest uppercase hover:text-on-surface transition-colors"
                         aria-label="Dismiss recommendation and override manually"
