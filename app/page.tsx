@@ -805,14 +805,22 @@ export default function Dashboard() {
 
                       {/* CTA buttons */}
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           if (!incident) return;
-                          setChatOpen(true);
-                          setChatInput(
-                            `APPROVED: Execute the recommended action for incident "${incident.title}" (ID: ${incident.id}). ` +
-                            `Action: "${aiRec.actionSequence}". ` +
-                            `Update the incident status to responding, log the approval via pushActivity, and advance the response protocol.`
-                          );
+                          try {
+                            const res = await fetch("/api/dashboard/approve", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ incidentId: incident.id }),
+                            });
+                            const result = await res.json();
+                            if (result.success) {
+                              // Refresh dashboard to show updated status
+                              refreshDashboard();
+                            }
+                          } catch {
+                            console.error("[approve] failed");
+                          }
                         }}
                         className="w-full py-3.5 rounded-xl bg-tertiary-gradient text-white font-bold text-sm tracking-widest uppercase shadow-lg shadow-tertiary/20 hover:opacity-90 transition-all flex items-center justify-center gap-3 active:scale-95 duration-100"
                         aria-label="Approve resource dispatch"
