@@ -108,12 +108,11 @@ export async function POST(req: Request) {
           title: z.string().describe('Signal title, e.g. "Structural Collapse — Oak St"'),
           desc: z.string().describe('Signal description'),
           source: z.string().describe('Signal source, e.g. "Field Responder", "Camera Feed AI"'),
-          credibility: z.number().describe('AI credibility score 0-100'),
           icon: z.string().describe('Material Symbols icon name'),
           severity: z.number().describe('Severity 1-5 for incident creation'),
           incidentType: z.string().describe('One of: flood, fire, structural, medical, hazmat, earthquake, infrastructure, cyber, other'),
         }),
-        execute: async ({ tag, tagColor, title, desc, source, credibility, icon, severity, incidentType }) => {
+        execute: async ({ tag, tagColor, title, desc, source, icon, severity, incidentType }) => {
           // Update in-memory dashboard
           const card = addSignal({
             tag,
@@ -121,8 +120,6 @@ export async function POST(req: Request) {
             title,
             desc,
             source,
-            credibility,
-            credibilityColor: credibility >= 80 ? 'bg-tertiary' : credibility >= 50 ? 'bg-warning' : 'bg-error',
             time: 'just now',
             icon,
           });
@@ -243,8 +240,6 @@ export async function POST(req: Request) {
           incidentDelta: z.string().optional().describe('e.g. "+2/hr"'),
           resourceRequests: z.number().optional(),
           resourceStatus: z.string().optional().describe('e.g. "Pending", "Dispatched"'),
-          deploymentEtaMinutes: z.number().optional(),
-          signalHealthPct: z.number().optional(),
         }),
         execute: async (partial) => {
           updateStats(partial);
@@ -372,8 +367,6 @@ export async function POST(req: Request) {
               title: title || analysis.summary || 'Photo Analysis',
               desc: analysis.summary || 'AI photo analysis completed',
               source: 'Chat Photo Upload',
-              credibility: Math.round((analysis.confidence ?? 0.8) * 100),
-              credibilityColor: (analysis.confidence ?? 0.8) >= 0.8 ? 'bg-tertiary' : 'bg-warning',
               time: 'just now',
               icon: 'photo_camera',
               incidentId: resultIncidentId,

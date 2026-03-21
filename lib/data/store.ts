@@ -16,8 +16,6 @@ export interface DashboardStats {
   incidentDelta: string;       // e.g. "+2/hr"
   resourceRequests: number;
   resourceStatus: string;      // e.g. "Pending"
-  deploymentEtaMinutes: number;
-  signalHealthPct: number;
 }
 
 export interface SignalCard {
@@ -27,8 +25,6 @@ export interface SignalCard {
   title: string | null;
   desc: string | null;
   source: string | null;
-  credibility: number;
-  credibilityColor: string;
   time: string;
   icon: string;
   empty?: boolean;
@@ -86,8 +82,6 @@ export const stats: DashboardStats = {
   incidentDelta: '',
   resourceRequests: 0,
   resourceStatus: '',
-  deploymentEtaMinutes: 0,
-  signalHealthPct: 0,
 };
 
 export const signals: SignalCard[] = [];
@@ -119,6 +113,12 @@ let stepCounter = 0;
 
 export function updateStats(partial: Partial<DashboardStats>) {
   Object.assign(stats, partial);
+}
+
+export function addResourceRequest(description: string): void {
+  stats.resourceRequests += 1;
+  stats.resourceStatus = 'Pending';
+  addActivity('Incident Commander', `Resource request: ${description}`);
 }
 
 export function addSignal(card: Omit<SignalCard, 'id'>): SignalCard {
@@ -216,7 +216,6 @@ export async function syncDashboardFromDb(): Promise<DashboardData> {
       incidentDelta: activeIncidents.length > 0
         ? `+${activeIncidents.length} active`
         : '',
-      signalHealthPct: activeIncidents.length > 0 || recentSignals.length > 0 ? 98 : 0,
     });
 
     // Set the primary active incident — prefer one with AI analysis, else highest severity
@@ -275,8 +274,6 @@ export async function syncDashboardFromDb(): Promise<DashboardData> {
         title: inc.title,
         desc: inc.description ?? `${inc.type} incident — severity ${inc.severity}`,
         source: sources,
-        credibility: inc.severity >= 4 ? 95 : inc.severity >= 3 ? 80 : 60,
-        credibilityColor: inc.severity >= 4 ? 'bg-tertiary' : inc.severity >= 3 ? 'bg-tertiary' : 'bg-warning',
         time: timeSince(inc.createdAt),
         icon: incidentIconMap[inc.type] ?? 'sensors',
         incidentId: inc.id,
@@ -285,7 +282,6 @@ export async function syncDashboardFromDb(): Promise<DashboardData> {
 
     // Social signals → signal cards
     for (const sig of recentSignals) {
-      const credMap: Record<string, number> = { high: 95, medium: 70, unverified: 40, disputed: 15 };
       dbSignals.push({
         id: `db-sig-${String(++dbSigCount).padStart(3, '0')}`,
         tag: `${sig.credibility.toUpperCase()} // ${sig.platform.toUpperCase()}`,
@@ -293,8 +289,6 @@ export async function syncDashboardFromDb(): Promise<DashboardData> {
         title: sig.aiSummary ?? sig.text.slice(0, 80),
         desc: sig.text,
         source: `@${sig.handle}`,
-        credibility: credMap[sig.credibility] ?? 50,
-        credibilityColor: (credMap[sig.credibility] ?? 50) >= 80 ? 'bg-tertiary' : (credMap[sig.credibility] ?? 50) >= 50 ? 'bg-warning' : 'bg-error',
         time: timeSince(sig.ingestedAt),
         icon: 'person_search',
       });
@@ -309,8 +303,6 @@ export async function syncDashboardFromDb(): Promise<DashboardData> {
         title: alert.detectedEvent,
         desc: alert.aiAnalysis ?? alert.detectedEvent,
         source: alert.cameraName,
-        credibility: Math.round(alert.confidence * 100),
-        credibilityColor: alert.confidence >= 0.8 ? 'bg-tertiary' : alert.confidence >= 0.5 ? 'bg-warning' : 'bg-error',
         time: timeSince(alert.createdAt),
         icon: 'videocam',
       });

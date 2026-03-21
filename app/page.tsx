@@ -16,8 +16,6 @@ interface DashboardStats {
   incidentDelta: string;
   resourceRequests: number;
   resourceStatus: string;
-  deploymentEtaMinutes: number;
-  signalHealthPct: number;
 }
 
 interface SignalCard {
@@ -27,8 +25,6 @@ interface SignalCard {
   title: string | null;
   desc: string | null;
   source: string | null;
-  credibility: number;
-  credibilityColor: string;
   time: string;
   icon: string;
   empty?: boolean;
@@ -545,8 +541,6 @@ export default function Dashboard() {
   const metrics = data ? [
     { label: "Active Incidents", value: formatMetricValue(data.stats.activeIncidents, true), sub: data.stats.incidentDelta, subColor: "text-error", accent: true },
     { label: "Resource Requests", value: formatMetricValue(data.stats.resourceRequests, true), sub: data.stats.resourceStatus, subColor: "text-tertiary", accent: false },
-    { label: "Deployment ETA", value: data.stats.deploymentEtaMinutes > 0 ? `${data.stats.deploymentEtaMinutes}m` : "\u2014", sub: data.stats.deploymentEtaMinutes > 0 ? "avg" : "", subColor: "text-on-surface-variant", accent: false },
-    { label: "Signal Health", value: data.stats.signalHealthPct > 0 ? `${data.stats.signalHealthPct}%` : "\u2014", sub: "", subColor: "text-tertiary", accent: false },
   ] : [];
 
   const incident = data?.activeIncident ?? null;
@@ -560,7 +554,7 @@ export default function Dashboard() {
           case "Field": return tag.includes("FIELD") || source.includes("FIELD");
           case "Social": return tag.includes("SOCIAL") || source.includes("SOCIAL") || tag.includes("X");
           case "Camera": return tag.includes("CAMERA") || source.includes("CAMERA") || card.icon === "videocam";
-          case "Critical": return tag.includes("CRITICAL") || (card.credibility ?? 0) >= 90;
+          case "Critical": return tag.includes("CRITICAL");
           default: return true;
         }
       });
@@ -944,12 +938,10 @@ export default function Dashboard() {
                     </div>
                     {(incident ? [
                       { label: "Severity Level", pct: incident.severity * 20, warn: incident.severity >= 4 },
-                      { label: "Signal Health", pct: data?.stats.signalHealthPct ?? 0 },
                       { label: "Active Signals", pct: Math.min(100, signalCards.length * 20) },
                     ] : [
                       { label: "Field Teams Active", pct: 0 },
                       { label: "Shelter Capacity", pct: 0 },
-                      { label: "Comms Signal", pct: 0 },
                     ]).map((bar) => (
                       <div key={bar.label} className="space-y-1.5">
                         <div className="flex justify-between text-xs">
@@ -1066,17 +1058,9 @@ export default function Dashboard() {
                               <span className="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant">
                                 {card.source}
                               </span>
-                              <div className="flex flex-col items-end gap-1">
-                                <span className="text-[9px] uppercase tracking-tighter text-on-surface-variant">
-                                  AI Credibility
-                                </span>
-                                <div className="w-14 h-1 bg-surface-container-high rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full rounded-full ${card.credibilityColor}`}
-                                    style={{ width: `${card.credibility}%` }}
-                                  />
-                                </div>
-                              </div>
+                              <span className="text-[10px] font-mono text-on-surface-variant">
+                                {card.time}
+                              </span>
                             </div>
                           </div>
                         )}

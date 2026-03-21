@@ -142,6 +142,12 @@ export default function IncidentDetailPage() {
   const [publishing, setPublishing] = useState(false);
   const [publicUrl, setPublicUrl] = useState<string | null>(null);
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
+  const [resourceModalOpen, setResourceModalOpen] = useState(false);
+  const [resourceType, setResourceType] = useState("medical_team");
+  const [resourceQty, setResourceQty] = useState(1);
+  const [resourcePriority, setResourcePriority] = useState("high");
+  const [resourceNotes, setResourceNotes] = useState("");
+  const [resourceSubmitting, setResourceSubmitting] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Swarm state
@@ -275,6 +281,34 @@ export default function IncidentDetailPage() {
       });
     } finally {
       setSwarmRunning(false);
+    }
+  };
+
+  // Resource request handler
+  const handleResourceRequest = async () => {
+    if (!incidentId || resourceSubmitting) return;
+    setResourceSubmitting(true);
+    try {
+      const res = await fetch(`/api/incidents/${incidentId}/resources`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          resourceType,
+          quantity: resourceQty,
+          priority: resourcePriority,
+          notes: resourceNotes || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setResourceModalOpen(false);
+        setResourceNotes("");
+        setResourceQty(1);
+      }
+    } catch {
+      console.error("[resource-request] failed");
+    } finally {
+      setResourceSubmitting(false);
     }
   };
 
@@ -490,9 +524,121 @@ export default function IncidentDetailPage() {
                   )}
                 </button>
               )}
+              <button
+                onClick={() => setResourceModalOpen(true)}
+                className="px-5 py-2 bg-secondary-container text-on-secondary-container font-semibold text-sm rounded-lg flex items-center gap-2 hover:bg-surface-bright transition-colors active:scale-95"
+              >
+                <span className="material-symbols-outlined text-[16px]">local_shipping</span>
+                Request Resources
+              </button>
             </div>
           </div>
         </section>
+
+        {/* ── Resource Request Modal ──────────────────────── */}
+        {resourceModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-surface-container-high border border-outline-variant/20 rounded-2xl p-7 w-full max-w-md shadow-2xl">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-on-surface">Request Resources</h3>
+                <button
+                  onClick={() => setResourceModalOpen(false)}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1.5">
+                    Resource Type
+                  </label>
+                  <select
+                    value={resourceType}
+                    onChange={(e) => setResourceType(e.target.value)}
+                    className="w-full bg-surface-container-lowest border border-outline-variant/15 rounded-lg px-3 py-2 text-sm text-on-surface outline-none focus:border-tertiary transition-colors"
+                  >
+                    <option value="medical_team">Medical Team</option>
+                    <option value="search_rescue">Search & Rescue</option>
+                    <option value="fire_engine">Fire Engine</option>
+                    <option value="hazmat_unit">HAZMAT Unit</option>
+                    <option value="ambulance">Ambulance</option>
+                    <option value="police_unit">Police Unit</option>
+                    <option value="evacuation_bus">Evacuation Bus</option>
+                    <option value="water_tanker">Water Tanker</option>
+                    <option value="generator">Generator</option>
+                    <option value="shelter_supplies">Shelter Supplies</option>
+                    <option value="communication_equipment">Communication Equipment</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1.5">
+                      Quantity
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={99}
+                      value={resourceQty}
+                      onChange={(e) => setResourceQty(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-full bg-surface-container-lowest border border-outline-variant/15 rounded-lg px-3 py-2 text-sm text-on-surface outline-none focus:border-tertiary transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1.5">
+                      Priority
+                    </label>
+                    <select
+                      value={resourcePriority}
+                      onChange={(e) => setResourcePriority(e.target.value)}
+                      className="w-full bg-surface-container-lowest border border-outline-variant/15 rounded-lg px-3 py-2 text-sm text-on-surface outline-none focus:border-tertiary transition-colors"
+                    >
+                      <option value="critical">Critical</option>
+                      <option value="high">High</option>
+                      <option value="medium">Medium</option>
+                      <option value="low">Low</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1.5">
+                    Notes (optional)
+                  </label>
+                  <textarea
+                    value={resourceNotes}
+                    onChange={(e) => setResourceNotes(e.target.value)}
+                    placeholder="Additional context for this request..."
+                    rows={3}
+                    className="w-full bg-surface-container-lowest border border-outline-variant/15 rounded-lg px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:border-tertiary transition-colors resize-none"
+                  />
+                </div>
+
+                <button
+                  onClick={handleResourceRequest}
+                  disabled={resourceSubmitting}
+                  className="w-full py-3 rounded-xl bg-tertiary-gradient text-white font-bold text-sm tracking-widest uppercase hover:opacity-90 transition-opacity active:scale-95 disabled:opacity-40 flex items-center justify-center gap-2"
+                >
+                  {resourceSubmitting ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Submitting…
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[16px]">send</span>
+                      Submit Request
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Multi-Agent Swarm ─────────────────────────── */}
         <section className="mb-10">

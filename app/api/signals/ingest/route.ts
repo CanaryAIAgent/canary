@@ -74,8 +74,6 @@ Choose an appropriate Material Symbols icon name (e.g. "apartment" for structura
       title: analysis.title,
       desc: analysis.summary,
       source: parsed.data.source ?? parsed.data.type,
-      credibility: analysis.credibility,
-      credibilityColor: analysis.credibility >= 80 ? 'bg-tertiary' : analysis.credibility >= 50 ? 'bg-warning' : 'bg-error',
       time: 'just now',
       icon: analysis.icon,
     });
@@ -89,7 +87,6 @@ Choose an appropriate Material Symbols icon name (e.g. "apartment" for structura
     if (analysis.isEmergency) {
       updateStats({
         activeIncidents: stats.activeIncidents + 1,
-        signalHealthPct: Math.max(0, Math.min(100, stats.signalHealthPct > 0 ? stats.signalHealthPct : 98)),
       });
     }
 

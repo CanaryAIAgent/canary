@@ -143,8 +143,6 @@ export async function POST(request: Request) {
       title: title || analysis.summary || 'Photo Analysis',
       desc: analysis.summary || 'AI photo analysis completed',
       source: 'Photo Upload',
-      credibility: Math.round((analysis.confidence ?? 0.8) * 100),
-      credibilityColor: (analysis.confidence ?? 0.8) >= 0.8 ? 'bg-tertiary' : 'bg-warning',
       time: 'just now',
       icon: 'photo_camera',
       incidentId: resultIncidentId,

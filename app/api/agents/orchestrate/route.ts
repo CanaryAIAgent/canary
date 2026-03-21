@@ -49,8 +49,6 @@ export async function POST(req: Request) {
           : 'Incoming Alert',
         desc: parsed.data.context ?? result.summary.slice(0, 150),
         source: parsed.data.source,
-        credibility: 75,
-        credibilityColor: 'bg-tertiary',
         time: 'just now',
         icon: parsed.data.source === 'camera' ? 'videocam'
           : parsed.data.source === 'social' ? 'person_search'
