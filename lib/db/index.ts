@@ -8,7 +8,7 @@
  *   import { dbInsertIncident, dbGetIncident } from '@/lib/db';
  */
 
-import { createClient } from '@/lib/integrations/supabase/server';
+import { createServiceClient } from '@/lib/integrations/supabase/service';
 import type {
   Incident,
   AgentLog,
@@ -181,7 +181,7 @@ function rowToCameraAlert(row: any): CameraAlert {
 export async function dbInsertIncident(
   data: Omit<Incident, 'id' | 'createdAt' | 'updatedAt'>,
 ): Promise<Incident> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const row = incidentToRow(data);
 
   const { data: inserted, error } = await supabase
@@ -195,7 +195,7 @@ export async function dbInsertIncident(
 }
 
 export async function dbGetIncident(id: string): Promise<Incident | null> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   const { data: row, error } = await supabase
     .from('incidents')
@@ -214,7 +214,7 @@ export async function dbUpdateIncident(
   id: string,
   data: Partial<Incident>,
 ): Promise<Incident | null> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const row = incidentToRow(data);
 
   const { data: updated, error } = await supabase
@@ -240,7 +240,7 @@ export async function dbListIncidents(filters?: {
   limit?: number;
   offset?: number;
 }): Promise<Incident[]> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   let query = supabase.from('incidents').select('*');
 
   if (filters?.status) {
@@ -271,7 +271,7 @@ export async function dbListIncidents(filters?: {
 export async function dbInsertAgentLog(
   log: Omit<AgentLog, 'id'>,
 ): Promise<void> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   const row = {
     agent_type: log.agentType,
@@ -311,7 +311,7 @@ export async function dbListAgentLogs(filters?: {
   decisionRationale: string;
   timestamp: string;
 }>> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   let query = supabase
     .from('agent_logs')
     .select('id, agent_type, incident_id, session_id, step_index, decision_rationale, timestamp')
@@ -342,7 +342,7 @@ export async function dbGetRunbook(filters: {
   incidentType?: string;
   id?: string;
 }): Promise<Runbook | null> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   let query = supabase.from('runbooks').select('*');
 
@@ -383,7 +383,7 @@ export async function dbGetRunbook(filters: {
 export async function dbInsertSocialSignal(
   signal: Omit<SocialSignal, 'ingestedAt'>,
 ): Promise<SocialSignal> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   const row = {
     id: signal.id,
@@ -420,7 +420,7 @@ export async function dbListSocialSignals(filters?: {
   limit?: number;
   since?: string;
 }): Promise<SocialSignal[]> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   let query = supabase
     .from('social_signals')
     .select('*')
@@ -441,7 +441,7 @@ export async function dbListSocialSignals(filters?: {
 export async function dbInsertCameraAlert(
   alert: Omit<CameraAlert, 'id' | 'createdAt'>,
 ): Promise<CameraAlert> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   const row = {
     camera_id: alert.cameraId,
@@ -473,7 +473,7 @@ export async function dbListCameraAlerts(filters?: {
   limit?: number;
   since?: string;
 }): Promise<CameraAlert[]> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   let query = supabase
     .from('camera_alerts')
     .select('*')

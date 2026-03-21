@@ -250,22 +250,22 @@ const generateBlastRadiusTool = tool({
 
 export const TriageResultSchema = z.object({
   rootCause: z.string(),
-  rootCauseConfidence: z.number().min(0).max(1),
+  rootCauseConfidence: z.number().describe('Confidence 0.0-1.0'),
   blastRadius: z.string(),
-  blastRadiusDetails: z.record(z.string(), z.unknown()).optional(),
-  rtoEstimateMinutes: z.number().int().nonnegative(),
-  rpoEstimateMinutes: z.number().int().nonnegative(),
-  validatedSeverity: SeverityLevelSchema,
-  severityJustification: z.string().optional(),
-  immediateActions: z.array(z.string()).max(5),
+  rtoEstimateMinutes: z.number().describe('Recovery time objective in minutes'),
+  rpoEstimateMinutes: z.number().describe('Recovery point objective in minutes'),
+  validatedSeverity: z.number().describe('Severity level 1-5'),
+  severityJustification: z.string().nullable().describe('Reason for severity level'),
+  immediateActions: z.array(z.string()).describe('Up to 5 immediate recommended actions'),
   shouldEscalateToHuman: z.boolean(),
-  escalationReason: z.string().optional(),
-  runbookRecommendation: z.string().optional().describe('Recommended runbook ID or type'),
+  escalationReason: z.string().nullable().describe('Reason for escalation, or null'),
+  runbookRecommendation: z.string().nullable().describe('Recommended runbook ID or type, or null'),
   affectedPopulation: z
     .object({ min: z.number(), max: z.number() })
-    .optional(),
-  complianceRisk: z.array(z.string()).default([]),
-  analysisCompletedAt: z.string().datetime(),
+    .nullable()
+    .describe('Estimated min/max affected population, or null'),
+  complianceRisk: z.array(z.string()),
+  analysisCompletedAt: z.string(),
   agentSessionId: z.string(),
 });
 

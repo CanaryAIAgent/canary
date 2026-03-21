@@ -23,14 +23,14 @@ const IngestRequestSchema = z.object({
 });
 
 const SignalAnalysisSchema = z.object({
-  isEmergency: z.boolean().describe('Is this an actionable emergency signal?'),
-  severity: z.number().int().min(1).max(5),
-  category: z.enum(['flood', 'fire', 'structural', 'medical', 'hazmat', 'infrastructure', 'other']),
-  title: z.string().max(60).describe('Short signal title for the dashboard card'),
-  summary: z.string().max(200).describe('Brief summary of the signal'),
-  credibility: z.number().int().min(0).max(100),
-  extractedLocation: z.string().optional().describe('Any location mentioned'),
-  recommendedAction: z.enum(['dispatch', 'triage', 'monitor', 'ignore']),
+  isEmergency: z.boolean(),
+  severity: z.number().describe('Severity 1-5'),
+  category: z.string().describe('One of: flood, fire, structural, medical, hazmat, infrastructure, other'),
+  title: z.string().describe('Short signal title for the dashboard card (max 60 chars)'),
+  summary: z.string().describe('Brief summary of the signal (max 200 chars)'),
+  credibility: z.number().describe('Credibility score 0-100'),
+  extractedLocation: z.string().nullable().describe('Any location mentioned, or null'),
+  recommendedAction: z.string().describe('One of: dispatch, triage, monitor, ignore'),
   icon: z.string().describe('Material Symbols icon name matching the event type'),
 });
 
