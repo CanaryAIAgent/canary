@@ -9,9 +9,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Canary — AI-Native Disaster Recovery",
+  title: "Canary — AI-Powered Emergency Operations Center",
   description:
-    "Detects, reasons about, and responds to infrastructure failures — before they become outages.",
+    "AI-native disaster intelligence platform. Detects, triages, and coordinates emergency response in real time.",
 };
 
 export default function RootLayout({

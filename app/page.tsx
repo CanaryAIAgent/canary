@@ -579,7 +579,8 @@ export default function Dashboard() {
         {/* Logo mark */}
         <div className="flex items-center gap-4 px-4 mb-8 overflow-hidden">
           <div className="min-w-[24px] flex justify-center">
-            <span className="text-tertiary text-sm font-bold">C</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/canary-logo.svg" alt="Canary" className="w-6 h-6" />
           </div>
           <span className="font-bold uppercase tracking-widest text-xs text-on-surface whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200">
             Canary
@@ -645,8 +646,13 @@ export default function Dashboard() {
         {/* ── Top App Bar ──────────────────────────────────────────── */}
         <header className="fixed top-0 left-0 right-0 lg:left-14 z-40 h-14 bg-surface/90 backdrop-blur-xl border-b border-outline-variant/15 flex items-center justify-between px-6">
           <div className="flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/canary-logo.svg" alt="" className="w-5 h-5 lg:hidden" />
             <h1 className="font-bold text-base tracking-tighter text-on-surface">
               Canary
+              <span className="font-normal text-on-surface-variant ml-2 text-xs hidden sm:inline">
+                Emergency Operations Center
+              </span>
             </h1>
           </div>
 
