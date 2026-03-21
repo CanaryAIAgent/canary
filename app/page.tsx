@@ -291,6 +291,7 @@ export default function Dashboard() {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [signalModalOpen, setSignalModalOpen] = useState(false);
+  const [signalFilter, setSignalFilter] = useState("All Signals");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const refreshDashboard = useCallback(() => {
@@ -376,7 +377,20 @@ export default function Dashboard() {
   ] : [];
 
   const incident = data?.activeIncident ?? null;
-  const signalCards = data?.signals ?? [];
+  const allSignalCards = data?.signals ?? [];
+  const signalCards = signalFilter === "All Signals"
+    ? allSignalCards
+    : allSignalCards.filter((card) => {
+        const tag = (card.tag ?? "").toUpperCase();
+        const source = (card.source ?? "").toUpperCase();
+        switch (signalFilter) {
+          case "Field": return tag.includes("FIELD") || source.includes("FIELD");
+          case "Social": return tag.includes("SOCIAL") || source.includes("SOCIAL") || tag.includes("X");
+          case "Camera": return tag.includes("CAMERA") || source.includes("CAMERA") || card.icon === "videocam";
+          case "Critical": return tag.includes("CRITICAL") || (card.credibility ?? 0) >= 90;
+          default: return true;
+        }
+      });
   const auditLog = data?.activity ?? [];
   const protocolSteps = data?.protocolSteps ?? [];
   const aiRec = data?.aiRecommendation;
@@ -612,11 +626,12 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex items-center gap-3 overflow-x-auto pb-3 scrollbar-thin mb-6">
-                  {["All Signals", "Field Reports", "Social Intel", "Camera Feeds", "Voice Notes"].map((f, i) => (
+                  {["All Signals", "Field", "Social", "Camera", "Critical"].map((f) => (
                     <button
                       key={f}
+                      onClick={() => setSignalFilter(f)}
                       className={`flex-shrink-0 px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase transition-colors ${
-                        i === 0
+                        signalFilter === f
                           ? "bg-tertiary text-white"
                           : "bg-surface-container-high text-on-surface-variant hover:bg-surface-bright"
                       }`}
