@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 
@@ -393,7 +394,7 @@ export default function Dashboard() {
 
   const fetchMentions = useCallback(async () => {
     try {
-      const res = await fetch("/api/xbot/log?limit=10");
+      const res = await fetch("/api/xbot/log?limit=12");
       const data = await res.json();
       setMentions(data.mentions || []);
     } catch (error) {
@@ -1026,11 +1027,20 @@ export default function Dashboard() {
                       <h3 className="text-base font-semibold text-on-surface">Recent X Mentions</h3>
                       <p className="text-on-surface-variant text-xs mt-0.5">Latest @canaryaiagent mentions from X (Twitter)</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-tertiary text-[16px]">share</span>
-                      <span className="text-xs font-semibold text-on-surface-variant">
-                        {mentions.length} {mentions.length === 1 ? 'mention' : 'mentions'}
-                      </span>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-tertiary text-[16px]">share</span>
+                        <span className="text-xs font-semibold text-on-surface-variant">
+                          {mentions.length} {mentions.length === 1 ? 'mention' : 'mentions'}
+                        </span>
+                      </div>
+                      <Link
+                        href="/mentions"
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface-container-low hover:bg-surface-container-high text-on-surface-variant hover:text-tertiary transition-colors text-xs font-semibold"
+                      >
+                        View All
+                        <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                      </Link>
                     </div>
                   </div>
 
