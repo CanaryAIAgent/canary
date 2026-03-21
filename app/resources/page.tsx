@@ -92,8 +92,8 @@ export default function ResourcesPage() {
       const qs = params.toString();
       const res = await fetch(`/api/resources${qs ? `?${qs}` : ""}`);
       if (res.ok) {
-        const data = await res.json();
-        setRequests(Array.isArray(data) ? data : data.requests ?? []);
+        const json = await res.json();
+        setRequests(json.data ?? []);
       }
     } catch {
       /* ignore */
@@ -106,8 +106,8 @@ export default function ResourcesPage() {
     try {
       const res = await fetch("/api/incidents");
       if (res.ok) {
-        const data = await res.json();
-        setIncidents(Array.isArray(data) ? data : data.incidents ?? []);
+        const json = await res.json();
+        setIncidents(json.data ?? []);
       }
     } catch {
       /* ignore */
