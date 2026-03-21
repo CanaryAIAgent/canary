@@ -9,7 +9,7 @@
  * All mutations persist to Supabase.
  */
 
-import { streamText, UIMessage, convertToModelMessages, tool } from 'ai';
+import { streamText, UIMessage, convertToModelMessages, tool, stepCountIs } from 'ai';
 import { z } from 'zod';
 import { getFlashModel } from '@/lib/ai/config';
 import {
@@ -79,6 +79,7 @@ export async function POST(req: Request) {
     model: getFlashModel(),
     system: EOC_SYSTEM_PROMPT + `\n\n## Current Dashboard State\n${JSON.stringify(dashboardState, null, 2)}`,
     messages: await convertToModelMessages(messages),
+    stopWhen: stepCountIs(10),
     tools: {
       // Dashboard mutation tools — all persist to Supabase
       pushSignal: tool({
