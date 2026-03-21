@@ -189,19 +189,44 @@ export async function syncDashboardFromDb(): Promise<DashboardData> {
       return getDashboardData();
     }
 
-    // Merge DB incidents count with in-memory count (take the higher)
+    // Stats from DB — incidents are the source of truth
     updateStats({
-      activeIncidents: Math.max(activeIncidents.length, stats.activeIncidents),
+      activeIncidents: activeIncidents.length,
       incidentDelta: activeIncidents.length > 0
-        ? `${activeIncidents.length} active`
-        : stats.incidentDelta,
-      signalHealthPct: recentSignals.length > 0 ? 100 : stats.signalHealthPct,
+        ? `+${activeIncidents.length} active`
+        : '',
+      signalHealthPct: activeIncidents.length > 0 || recentSignals.length > 0 ? 98 : 0,
     });
 
-    // Prepend DB signals before in-memory ones (DB = persisted, in-memory = recent)
+    // Build signal cards from ALL DB sources: incidents, social signals, camera alerts
     const dbSignals: SignalCard[] = [];
     let dbSigCount = 0;
 
+    const incidentIconMap: Record<string, string> = {
+      flood: 'water', fire: 'local_fire_department', structural: 'apartment',
+      medical: 'emergency', hazmat: 'skull', earthquake: 'landslide',
+      infrastructure: 'construction', cyber: 'security', other: 'sensors',
+    };
+
+    // Incidents → signal cards (primary source of dashboard signals)
+    for (const inc of activeIncidents) {
+      const sources = (inc.sources ?? []).join('/').toUpperCase() || 'SYSTEM';
+      const tagPrefix = inc.severity >= 4 ? 'CRITICAL' : inc.severity >= 3 ? 'ALERT' : 'MONITOR';
+      dbSignals.push({
+        id: `db-inc-${String(++dbSigCount).padStart(3, '0')}`,
+        tag: `${tagPrefix} // ${sources}`,
+        tagColor: inc.severity >= 4 ? 'text-error' : inc.severity >= 3 ? 'text-tertiary' : 'text-on-surface-variant',
+        title: inc.title,
+        desc: inc.description ?? `${inc.type} incident — severity ${inc.severity}`,
+        source: sources,
+        credibility: inc.severity >= 4 ? 95 : inc.severity >= 3 ? 80 : 60,
+        credibilityColor: inc.severity >= 4 ? 'bg-tertiary' : inc.severity >= 3 ? 'bg-tertiary' : 'bg-warning',
+        time: timeSince(inc.createdAt),
+        icon: incidentIconMap[inc.type] ?? 'sensors',
+      });
+    }
+
+    // Social signals → signal cards
     for (const sig of recentSignals) {
       const credMap: Record<string, number> = { high: 95, medium: 70, unverified: 40, disputed: 15 };
       dbSignals.push({
@@ -218,6 +243,7 @@ export async function syncDashboardFromDb(): Promise<DashboardData> {
       });
     }
 
+    // Camera alerts → signal cards
     for (const alert of recentAlerts) {
       dbSignals.push({
         id: `db-sig-${String(++dbSigCount).padStart(3, '0')}`,
@@ -233,11 +259,13 @@ export async function syncDashboardFromDb(): Promise<DashboardData> {
       });
     }
 
-    // Merge: in-memory signals first (newest), then DB signals, capped at 20
+    // Replace signals with DB data (DB is the source of truth for persisted state)
     if (dbSignals.length > 0) {
-      const existingIds = new Set(signals.map((s) => s.title));
-      const deduped = dbSignals.filter((s) => !existingIds.has(s.title));
-      signals.push(...deduped);
+      const existingTitles = new Set(dbSignals.map((s) => s.title));
+      // Keep any in-memory signals not already in DB
+      const memOnly = signals.filter((s) => !existingTitles.has(s.title));
+      signals.length = 0;
+      signals.push(...dbSignals, ...memOnly);
       if (signals.length > 20) signals.length = 20;
     }
 
