@@ -356,6 +356,10 @@ export default function Dashboard() {
   const [modelTier, setModelTier] = useState<"flash" | "pro" | "pro3">("flash");
   const [photoModel, setPhotoModel] = useState<"flash" | "nano-banana">("flash");
 
+  // Chat image upload state
+  const [chatFiles, setChatFiles] = useState<File[]>([]);
+  const chatFileInputRef = useRef<HTMLInputElement>(null);
+
   const refreshDashboard = useCallback(() => {
     fetch("/api/dashboard")
       .then((r) => r.json())
@@ -1597,6 +1601,20 @@ export default function Dashboard() {
                     if (part.type === "text") {
                       return <span key={`${msg.id}-${i}`}>{part.text}</span>;
                     }
+                    if (part.type === "file") {
+                      const filePart = part as { type: "file"; mediaType?: string; url: string };
+                      if (filePart.mediaType?.startsWith("image/")) {
+                        return (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            key={`${msg.id}-${i}`}
+                            src={filePart.url}
+                            alt="Uploaded image"
+                            className="rounded-lg max-w-full max-h-48 object-cover my-1"
+                          />
+                        );
+                      }
+                    }
                     if (part.type.startsWith("tool-")) {
                       const toolPart = part as { type: string; toolCallId: string; state: string; toolName?: string };
                       const toolLabel = toolPart.toolName ?? part.type.replace("tool-", "");
@@ -1672,26 +1690,98 @@ export default function Dashboard() {
             </button>
           </div>
 
+          {/* Chat image previews */}
+          {chatFiles.length > 0 && (
+            <div className="flex gap-2 px-4 py-2 border-t border-outline-variant/10 shrink-0 overflow-x-auto scrollbar-thin">
+              {chatFiles.map((file, i) => (
+                <div key={`${file.name}-${i}`} className="relative group shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-surface-container-highest">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={URL.createObjectURL(file)} alt={file.name} className="w-full h-full object-cover" />
+                  <button
+                    onClick={() => setChatFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                    className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label={`Remove ${file.name}`}
+                  >
+                    <span className="material-symbols-outlined text-[10px]">close</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Chat input */}
           <form
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
-              if (!chatInput.trim() || chatStatus !== "ready") return;
-              sendMessage({ text: chatInput });
+              if ((!chatInput.trim() && chatFiles.length === 0) || chatStatus !== "ready") return;
+
+              // Build message parts
+              const parts: Array<{ type: "text"; text: string } | { type: "file"; mediaType: string; url: string }> = [];
+
+              if (chatInput.trim()) {
+                parts.push({ type: "text", text: chatInput });
+              }
+
+              // Convert files to data URLs
+              if (chatFiles.length > 0) {
+                const fileParts = await Promise.all(
+                  chatFiles.map(
+                    (file) =>
+                      new Promise<{ type: "file"; mediaType: string; url: string }>((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve({ type: "file", mediaType: file.type, url: reader.result as string });
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                      }),
+                  ),
+                );
+                parts.push(...fileParts);
+                if (!chatInput.trim()) {
+                  parts.unshift({ type: "text", text: `Analyze ${chatFiles.length} uploaded photo(s) for incident damage assessment.` });
+                }
+              }
+
+              sendMessage({ role: "user", parts } as Parameters<typeof sendMessage>[0]);
               setChatInput("");
+              setChatFiles([]);
+              if (chatFileInputRef.current) chatFileInputRef.current.value = "";
             }}
             className="flex items-center gap-2 px-4 py-3 border-t border-outline-variant/15 shrink-0"
           >
             <input
+              ref={chatFileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files) {
+                  const newFiles = Array.from(e.target.files).filter((f) =>
+                    ["image/jpeg", "image/png", "image/webp"].includes(f.type)
+                  );
+                  setChatFiles((prev) => [...prev, ...newFiles].slice(0, 5));
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => chatFileInputRef.current?.click()}
+              disabled={chatStatus !== "ready"}
+              className="w-9 h-9 rounded-lg bg-surface-container-lowest border border-outline-variant/15 flex items-center justify-center text-on-surface-variant hover:text-tertiary hover:border-tertiary/30 transition-colors disabled:opacity-30 shrink-0"
+              aria-label="Attach images"
+            >
+              <span className="material-symbols-outlined text-[18px]">add_photo_alternate</span>
+            </button>
+            <input
               value={chatInput}
               onChange={(e) => setChatInput(e.currentTarget.value)}
-              placeholder="Report signal or ask AI…"
+              placeholder={chatFiles.length > 0 ? "Add context or send photos…" : "Report signal or ask AI…"}
               className="flex-1 bg-surface-container-lowest border border-outline-variant/15 focus:border-tertiary rounded-lg px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/50 outline-none transition-colors"
               disabled={chatStatus !== "ready"}
             />
             <button
               type="submit"
-              disabled={!chatInput.trim() || chatStatus !== "ready"}
+              disabled={(!chatInput.trim() && chatFiles.length === 0) || chatStatus !== "ready"}
               className="w-9 h-9 rounded-lg bg-tertiary-gradient flex items-center justify-center text-white disabled:opacity-30 transition-opacity active:scale-95 shrink-0"
               aria-label="Send message"
             >

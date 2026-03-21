@@ -9,9 +9,10 @@
  * All mutations persist to Supabase.
  */
 
-import { streamText, UIMessage, convertToModelMessages, tool, stepCountIs } from 'ai';
+import { streamText, generateObject, UIMessage, convertToModelMessages, tool, stepCountIs } from 'ai';
 import { z } from 'zod';
-import { getModel, type ModelTier } from '@/lib/ai/config';
+import { getModel, getPhotoModel, type ModelTier } from '@/lib/ai/config';
+import { PhotoAnalysisResponseSchema } from '@/lib/schemas';
 import {
   checkShelterCapacityTool,
   createIncidentTool,
@@ -28,7 +29,7 @@ import {
   setProtocolSteps,
   getDashboardData,
 } from '@/lib/data/store';
-import { dbInsertIncident, dbInsertAgentLog, dbUpdateIncident, dbListIncidents } from '@/lib/db';
+import { dbInsertIncident, dbGetIncident, dbInsertAgentLog, dbUpdateIncident, dbListIncidents } from '@/lib/db';
 
 export const maxDuration = 60;
 
@@ -60,7 +61,11 @@ You can push updates to the live dashboard using these tools:
 - updateDashboardStats: Update the key metrics row.
 - createIncident: Create a formal incident record. Use ONLY for genuinely new incidents.
 
+## Photo Analysis
+When the user uploads images in the chat, you MUST call the analyzePhotos tool to run AI-powered damage assessment. The tool uses Gemini's multimodal capabilities to detect hazards, structural damage, and recommend actions. After analysis, summarize the findings for the user and push relevant updates to the dashboard.
+
 ## CRITICAL RULES
+- When the user sends images: ALWAYS call analyzePhotos with the image URLs from the message. Describe what you see and the analysis results.
 - When asked to TRIAGE an existing incident: use pushRecommendation and setResponseProtocol. Do NOT create a new incident or use pushSignal.
 - When asked to REPORT a new signal: use pushSignal (which creates an incident automatically).
 - When asked to GENERATE A REPORT: provide a detailed analysis as text and use pushRecommendation to summarize key findings.
@@ -264,6 +269,120 @@ export async function POST(req: Request) {
           }
 
           return { success: true, message: `Protocol set with ${steps.length} steps` };
+        },
+      }),
+
+      // Photo analysis tool — multimodal AI damage assessment
+      analyzePhotos: tool({
+        description: 'Analyze incident photos using multimodal AI (Nano Banana 2). Call this when the user uploads images in chat. Detects damage, hazards, structural issues, and recommends actions. Can link to an existing incident or create a new one.',
+        inputSchema: z.object({
+          imageUrls: z.array(z.string()).describe('Data URLs of images from the chat message (e.g. data:image/jpeg;base64,...)'),
+          incidentId: z.string().uuid().optional().describe('Existing incident ID to link photos to'),
+          title: z.string().optional().describe('Title for a new incident (required if no incidentId)'),
+          description: z.string().optional().describe('Additional context about the photos'),
+          location: z.string().optional().describe('Location context if known'),
+        }),
+        execute: async ({ imageUrls, incidentId, title, description, location }) => {
+          try {
+            const imageParts = imageUrls.map((url) => ({ type: 'image' as const, image: url }));
+
+            const promptText = [
+              'Analyze the following incident photo(s) for emergency response purposes.',
+              'Identify any damage, hazards, structural issues, and relevant details.',
+              'Provide a severity rating from 1 (minor) to 5 (critical).',
+              'Categorize the type of damage using ATC-45 rapid assessment categories if applicable.',
+              'List any detected objects, hazards, and recommended actions.',
+              location ? `Known location context: ${location}` : null,
+              description ? `Additional context: ${description}` : null,
+            ].filter(Boolean).join('\n');
+
+            const { object: analysis } = await generateObject({
+              model: getPhotoModel('nano-banana'),
+              schema: PhotoAnalysisResponseSchema,
+              messages: [
+                {
+                  role: 'user',
+                  content: [
+                    { type: 'text', text: promptText },
+                    ...imageParts,
+                  ],
+                },
+              ],
+            });
+
+            const finalSeverity = analysis.severity ?? 3;
+            let resultIncidentId: string;
+            let isNewIncident = false;
+
+            if (incidentId) {
+              const existing = await dbGetIncident(incidentId);
+              if (existing) {
+                await dbUpdateIncident(incidentId, {
+                  aiAnalysis: analysis,
+                  severity: finalSeverity,
+                });
+                resultIncidentId = incidentId;
+              } else {
+                return { success: false, error: 'Incident not found' };
+              }
+            } else {
+              const incidentType = ['flood', 'fire', 'structural', 'medical', 'hazmat', 'earthquake', 'infrastructure', 'cyber'].includes(analysis.damageCategory ?? '')
+                ? analysis.damageCategory as 'flood' | 'fire' | 'structural' | 'medical' | 'hazmat' | 'earthquake' | 'infrastructure' | 'cyber'
+                : 'other' as const;
+
+              const newIncident = await dbInsertIncident({
+                title: title || analysis.summary || 'Photo Analysis Incident',
+                description: description || analysis.summary || '',
+                type: incidentType,
+                severity: finalSeverity,
+                status: 'new',
+                location: location ? { description: location } : (analysis.extractedAddress ? { description: analysis.extractedAddress } : {}),
+                sources: ['field'],
+                aiAnalysis: analysis,
+                mediaUrls: [],
+                corroboratedBySignals: [],
+                linkedCameraAlerts: [],
+              });
+              resultIncidentId = newIncident.id;
+              isNewIncident = true;
+
+              updateStats({ activeIncidents: (getDashboardData().stats.activeIncidents) + 1 });
+            }
+
+            // Push to dashboard
+            const tagPrefix = finalSeverity >= 4 ? 'CRITICAL' : finalSeverity >= 3 ? 'ALERT' : 'MONITOR';
+            addSignal({
+              tag: `${tagPrefix} // PHOTO`,
+              tagColor: finalSeverity >= 4 ? 'text-error' : finalSeverity >= 3 ? 'text-tertiary' : 'text-on-surface-variant',
+              title: title || analysis.summary || 'Photo Analysis',
+              desc: analysis.summary || 'AI photo analysis completed',
+              source: 'Chat Photo Upload',
+              credibility: Math.round((analysis.confidence ?? 0.8) * 100),
+              credibilityColor: (analysis.confidence ?? 0.8) >= 0.8 ? 'bg-tertiary' : 'bg-warning',
+              time: 'just now',
+              icon: 'photo_camera',
+              incidentId: resultIncidentId,
+            });
+
+            addActivity('Photo Analyzer', `Analyzed ${imageUrls.length} photo(s) via chat — severity ${finalSeverity}`);
+
+            return {
+              success: true,
+              incidentId: resultIncidentId,
+              isNewIncident,
+              severity: finalSeverity,
+              summary: analysis.summary,
+              hazards: analysis.hazards,
+              structuralIntegrity: analysis.structuralIntegrity ?? 'unknown',
+              damageCategory: analysis.damageCategory ?? 'unknown',
+              detectedObjects: analysis.detectedObjects ?? [],
+              recommendedActions: analysis.recommendedActions ?? [],
+              confidence: analysis.confidence,
+            };
+          } catch (err) {
+            console.error('[chat/analyzePhotos] error:', err);
+            return { success: false, error: err instanceof Error ? err.message : 'Photo analysis failed' };
+          }
         },
       }),
 
