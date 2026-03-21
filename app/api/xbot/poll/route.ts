@@ -41,6 +41,10 @@ let pollInterval: NodeJS.Timeout | undefined;
 export async function GET(request: NextRequest) {
   const action = request.nextUrl.searchParams.get('action');
 
+  if (action === 'check') {
+    return checkForMentions();
+  }
+
   if (action === 'start') {
     return startPolling();
   }
@@ -60,8 +64,114 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     success: false,
-    error: 'Invalid action. Use ?action=start, ?action=stop, or ?action=status',
+    error: 'Invalid action. Use ?action=check, ?action=start, ?action=stop, or ?action=status',
   });
+}
+
+// ---------------------------------------------------------------------------
+// Check for mentions (stateless, for cron jobs)
+// ---------------------------------------------------------------------------
+
+async function checkForMentions() {
+  try {
+    console.log('[xbot-poll] Starting cron check for mentions...');
+
+    // 1. Get polling state from Supabase
+    const { data: pollingState, error: stateError } = await supabase
+      .from('xbot_polling_state')
+      .select('since_id, last_poll_at, enabled')
+      .eq('id', 'singleton')
+      .single();
+
+    if (stateError) {
+      console.error('[xbot-poll] Error fetching polling state:', stateError);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to fetch polling state',
+      });
+    }
+
+    // Check if bot is enabled
+    if (!pollingState?.enabled) {
+      console.log('[xbot-poll] Bot is disabled, skipping poll');
+      return NextResponse.json({
+        success: true,
+        message: 'Bot is disabled',
+        mentionsProcessed: 0,
+      });
+    }
+
+    const currentSinceId = pollingState?.since_id;
+    console.log('[xbot-poll] Current sinceId:', currentSinceId || 'none');
+
+    // 2. Authenticate and fetch mentions
+    const client = createXClient();
+    const userId = await getAuthenticatedUserId(client);
+    console.log('[xbot-poll] Authenticated as user ID:', userId);
+
+    const response = await fetchMentions(client, userId, currentSinceId);
+
+    if (response.data.length === 0) {
+      console.log('[xbot-poll] No new mentions found');
+
+      // Update last_poll_at even when there are no mentions
+      await supabase
+        .from('xbot_polling_state')
+        .update({ last_poll_at: new Date().toISOString() })
+        .eq('id', 'singleton');
+
+      return NextResponse.json({
+        success: true,
+        message: 'No new mentions',
+        mentionsProcessed: 0,
+      });
+    }
+
+    console.log(`[xbot-poll] Found ${response.data.length} new mention(s)`);
+
+    // 3. Process each mention
+    const processedIds: string[] = [];
+    for (const rawMention of response.data) {
+      const processed = await processMention(rawMention, response.includes, client, userId);
+      if (processed) {
+        processedIds.push(rawMention.id);
+      }
+    }
+
+    // 4. Update polling state with newest mention ID
+    const newSinceId = response.meta.newest_id || currentSinceId;
+    if (newSinceId) {
+      const { error: updateError } = await supabase
+        .from('xbot_polling_state')
+        .update({
+          since_id: newSinceId,
+          last_poll_at: new Date().toISOString(),
+        })
+        .eq('id', 'singleton');
+
+      if (updateError) {
+        console.error('[xbot-poll] Error updating polling state:', updateError);
+      } else {
+        console.log('[xbot-poll] Updated sinceId to:', newSinceId);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Mentions checked and processed',
+      mentionsProcessed: processedIds.length,
+      sinceId: newSinceId,
+    });
+  } catch (error) {
+    console.error('[xbot-poll] Error during cron check:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -165,7 +275,7 @@ async function pollMentions() {
 
     // Process each mention
     for (const rawMention of response.data) {
-      await processMention(rawMention, response.includes, client);
+      await processMention(rawMention, response.includes, client, authenticatedUserId);
     }
   } catch (error) {
     console.error('[xbot-poll] Error during polling:', error);
@@ -179,22 +289,36 @@ async function pollMentions() {
 async function processMention(
   rawMention: any,
   includes: any,
-  client: ReturnType<typeof createXClient>
-) {
+  client: ReturnType<typeof createXClient>,
+  botUserId?: string
+): Promise<boolean> {
   const tweetId = rawMention.id;
 
   try {
-    // 1. Check deduplication
-    if (processedTweetIds.has(tweetId)) {
+    // 1. Check deduplication using Supabase
+    const { data: existing } = await supabase
+      .from('xbot_mentions')
+      .select('tweet_id')
+      .eq('tweet_id', tweetId)
+      .single();
+
+    if (existing) {
       console.log(`[xbot-poll] Skipping duplicate mention: ${tweetId}`);
-      return;
+      return false;
+    }
+
+    // Also check in-memory set for current session
+    if (processedTweetIds.has(tweetId)) {
+      console.log(`[xbot-poll] Skipping duplicate mention (in-memory): ${tweetId}`);
+      return false;
     }
 
     // 2. Don't reply to bot's own tweets
-    if (rawMention.author_id === authenticatedUserId) {
+    const currentBotUserId = botUserId || authenticatedUserId;
+    if (currentBotUserId && rawMention.author_id === currentBotUserId) {
       console.log(`[xbot-poll] Skipping bot's own tweet: ${tweetId}`);
       processedTweetIds.add(tweetId);
-      return;
+      return false;
     }
 
     // 3. Extract full payload per XMentionSchema
@@ -278,8 +402,10 @@ async function processMention(
 
     // 9. Mark as processed
     processedTweetIds.add(tweetId);
+    return true;
   } catch (error) {
     console.error(`[xbot-poll] Error processing mention ${tweetId}:`, error);
     // Do not rethrow — one failed mention should not crash the polling loop
+    return false;
   }
 }
