@@ -305,7 +305,7 @@ export type SinkDeliveryPayload = z.infer<typeof SinkDeliveryPayloadSchema>;
 // Subscriber — zip code alert subscriptions
 // ---------------------------------------------------------------------------
 
-export const NotificationChannelSchema = z.enum(['email', 'sms', 'push']);
+export const NotificationChannelSchema = z.enum(['email', 'sms', 'push', 'telegram']);
 export type NotificationChannel = z.infer<typeof NotificationChannelSchema>;
 
 export const SubscriberSchema = z.object({
@@ -313,6 +313,7 @@ export const SubscriberSchema = z.object({
   email: z.string().email().optional(),
   phone: z.string().optional(),
   pushToken: z.string().optional(),
+  telegramChatId: z.string().optional(),
   zipCodes: z.array(z.string()).min(1),
   channels: z.array(NotificationChannelSchema).min(1),
   minSeverity: SeverityLevelSchema.default(3),
@@ -327,6 +328,7 @@ export type Subscriber = z.infer<typeof SubscriberSchema>;
 export const CreateSubscriberSchema = z.object({
   email: z.string().email().optional(),
   phone: z.string().optional(),
+  telegramChatId: z.string().optional(),
   zipCodes: z.array(z.string().regex(/^\d{5}(-\d{4})?$/)).min(1).max(10),
   channels: z.array(NotificationChannelSchema).min(1),
   minSeverity: SeverityLevelSchema.optional(),
