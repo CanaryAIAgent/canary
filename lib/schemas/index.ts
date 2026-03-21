@@ -345,6 +345,7 @@ export const AgentTypeSchema = z.enum([
   'recovery',
   'compliance',
   'runbook',
+  'xbot',
 ]);
 export type AgentType = z.infer<typeof AgentTypeSchema>;
 

@@ -396,47 +396,68 @@ export const deliverToSinkTool = tool({
 });
 
 // ---------------------------------------------------------------------------
-// searchSimilarIncidents — RAG search over incident history using embeddings
+// searchSimilarIncidents — search incident records by text and filters
 // ---------------------------------------------------------------------------
 
 export const searchSimilarIncidentsTool = tool({
   description:
-    'Search historical incident records for similar events. ' +
-    'Uses semantic similarity (embeddings) to find past incidents with the same root cause or type. ' +
-    'Use this to inform triage and runbook generation with institutional knowledge.',
+    'Search incident records for related or similar events by keywords, type, and text. ' +
+    'Searches across title, description, and location fields. ' +
+    'Use this to find existing incidents that match a new report, or to inform triage with institutional knowledge.',
   inputSchema: z.object({
-    query: z.string().describe('Natural language description of the incident to search for'),
-    incidentType: IncidentTypeSchema.optional(),
+    query: z.string().describe('Keywords or description to search for (e.g. "flooding Oak Street", "structural collapse")'),
+    incidentType: IncidentTypeSchema.optional().describe('Filter by incident type'),
     limit: z.number().int().positive().max(10).default(5),
-    minSimilarity: z.number().min(0).max(1).default(0.7),
   }),
-  execute: async ({ query, incidentType, limit, minSimilarity }) => {
-    // Production:
-    // 1. Embed the query: const { embedding } = await embed({ model: google.embedding('gemini-embedding-001'), value: query });
-    // 2. Vector search: SELECT * FROM incidents ORDER BY embedding <=> $1 LIMIT $2
-    void query;
-    void incidentType;
-    void limit;
-    void minSimilarity;
+  execute: async ({ query, incidentType, limit }) => {
+    try {
+      const { supabase } = await import('@/lib/db');
 
-    // Return mock similar incidents for development
-    return {
-      results: [
-        {
-          id: crypto.randomUUID(),
-          title: 'Similar historical incident (mock)',
-          type: incidentType ?? 'other',
-          severity: 4,
-          rootCause: 'Mock root cause from historical record',
-          resolution: 'Applied runbook RB-042 — resolved in 47 minutes',
-          rtoActual: 47,
-          similarity: 0.89,
-          timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-      ],
-      totalFound: 1,
-      searchedAt: new Date().toISOString(),
-    };
+      let dbQuery = supabase
+        .from('incidents')
+        .select('id, title, description, type, severity, status, location_description, location_address, sources, created_at')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      // Text search across title, description, location
+      if (query) {
+        const keywords = query.split(/\s+/).filter(w => w.length > 2);
+        const patterns = keywords.map(k => `title.ilike.%${k}%,description.ilike.%${k}%,location_description.ilike.%${k}%,location_address.ilike.%${k}%`);
+        if (patterns.length > 0) {
+          dbQuery = dbQuery.or(patterns.join(','));
+        }
+      }
+
+      if (incidentType) dbQuery = dbQuery.eq('type', incidentType);
+
+      const { data: rows, error } = await dbQuery;
+      if (error) throw new Error(error.message);
+
+      const results = (rows ?? []).map((row: Record<string, unknown>) => ({
+        id: row.id as string,
+        title: row.title as string,
+        description: (row.description as string) ?? '',
+        type: row.type as string,
+        severity: row.severity as number,
+        status: row.status as string,
+        location: (row.location_description ?? row.location_address ?? '') as string,
+        sources: (row.sources ?? []) as string[],
+        createdAt: row.created_at as string,
+      }));
+
+      return {
+        results,
+        totalFound: results.length,
+        searchedAt: new Date().toISOString(),
+      };
+    } catch (err) {
+      console.error('[searchSimilarIncidents] error:', err);
+      return {
+        results: [],
+        totalFound: 0,
+        searchedAt: new Date().toISOString(),
+      };
+    }
   },
 });
 

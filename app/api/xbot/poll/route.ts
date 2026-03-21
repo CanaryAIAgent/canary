@@ -391,7 +391,7 @@ async function processMention(
       has_location: hasLocation,
       confidence,
       ai_response: handlerResult.reply,
-      incident_id: handlerResult.shouldCreateIncident ? null : null, // TODO: link to incident when created
+      incident_id: handlerResult.incidentId ?? null,
     });
 
     if (dbError) {
