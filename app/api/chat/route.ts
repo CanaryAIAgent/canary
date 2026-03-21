@@ -28,7 +28,7 @@ import {
   setProtocolSteps,
   getDashboardData,
 } from '@/lib/data/store';
-import { dbInsertIncident, dbInsertAgentLog } from '@/lib/db';
+import { dbInsertIncident, dbInsertAgentLog, dbUpdateIncident, dbListIncidents } from '@/lib/db';
 
 export const maxDuration = 60;
 
@@ -53,13 +53,18 @@ const EOC_SYSTEM_PROMPT = `You are the Canary AI Assistant — the intelligent c
 
 ## Dashboard Integration
 You can push updates to the live dashboard using these tools:
-- pushSignal: Add a new signal card to the dashboard feed (also creates an incident in the database)
-- pushActivity: Log an action to the field activity feed (also persists to agent audit log)
-- pushRecommendation: Update the AI strategy recommendation panel
-- updateDashboardStats: Update the key metrics row
-- createIncident: Create a formal incident record in the database
+- pushSignal: Add a new signal card AND create an incident. Use ONLY for NEW reports you haven't seen before.
+- pushActivity: Log an action to the activity feed.
+- pushRecommendation: Update the AI strategy recommendation panel. ALWAYS use this when providing triage analysis or strategic advice. Include actionSequence, confidenceScore, stats, and ctaLabel.
+- setResponseProtocol: Set the response protocol checklist. ALWAYS use this when recommending a sequence of response steps.
+- updateDashboardStats: Update the key metrics row.
+- createIncident: Create a formal incident record. Use ONLY for genuinely new incidents.
 
-When you analyze a new report or make a recommendation, push the relevant updates so the dashboard stays current.
+## CRITICAL RULES
+- When asked to TRIAGE an existing incident: use pushRecommendation and setResponseProtocol. Do NOT create a new incident or use pushSignal.
+- When asked to REPORT a new signal: use pushSignal (which creates an incident automatically).
+- When asked to GENERATE A REPORT: provide a detailed analysis as text and use pushRecommendation to summarize key findings.
+- ALWAYS push updates to the dashboard — don't just respond with text.
 
 ## Context
 Current dashboard state will be provided. Use it to inform your responses and avoid duplicate entries.`;
@@ -177,8 +182,21 @@ export async function POST(req: Request) {
         execute: async ({ actionSequence, confidenceScore, stats: recStats, ctaLabel }) => {
           updateRecommendation({ actionSequence, confidenceScore, stats: recStats, ctaLabel });
 
-          // Persist recommendation as agent log
+          // Persist to active incident's ai_analysis in Supabase
           try {
+            const incidents = await dbListIncidents({ status: ['new', 'triaging', 'responding', 'escalated'], limit: 1 });
+            if (incidents.length > 0) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const existing = (incidents[0].aiAnalysis ?? {}) as any;
+              await dbUpdateIncident(incidents[0].id, {
+                aiAnalysis: {
+                  ...existing,
+                  recommendation: { actionSequence, confidenceScore, stats: recStats, ctaLabel },
+                  generatedAt: new Date().toISOString(),
+                } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+                status: 'triaging',
+              });
+            }
             await dbInsertAgentLog({
               agentType: 'orchestrator',
               sessionId: crypto.randomUUID(),
@@ -195,7 +213,7 @@ export async function POST(req: Request) {
             console.error('[chat/pushRecommendation] DB persist failed:', err);
           }
 
-          return { success: true, message: 'Recommendation panel updated' };
+          return { success: true, message: 'Recommendation panel updated and persisted' };
         },
       }),
 
@@ -226,6 +244,24 @@ export async function POST(req: Request) {
         }),
         execute: async ({ steps }) => {
           setProtocolSteps(steps);
+
+          // Persist protocol to active incident's ai_analysis
+          try {
+            const incidents = await dbListIncidents({ status: ['new', 'triaging', 'responding', 'escalated'], limit: 1 });
+            if (incidents.length > 0) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const existing = (incidents[0].aiAnalysis ?? {}) as any;
+              await dbUpdateIncident(incidents[0].id, {
+                aiAnalysis: {
+                  ...existing,
+                  protocolSteps: steps,
+                } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+              });
+            }
+          } catch (err) {
+            console.error('[chat/setResponseProtocol] DB persist failed:', err);
+          }
+
           return { success: true, message: `Protocol set with ${steps.length} steps` };
         },
       }),

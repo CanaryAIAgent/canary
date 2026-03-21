@@ -54,8 +54,21 @@ interface AiRecommendation {
   ctaLabel: string;
 }
 
+interface ActiveIncident {
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  severity: number;
+  status: string;
+  location: string;
+  sources: string[];
+  createdAt: string;
+}
+
 interface DashboardData {
   stats: DashboardStats;
+  activeIncident: ActiveIncident | null;
   signals: SignalCard[];
   activity: ActivityEntry[];
   protocolSteps: ProtocolStep[];
@@ -362,6 +375,7 @@ export default function Dashboard() {
     { label: "Signal Health", value: data.stats.signalHealthPct > 0 ? `${data.stats.signalHealthPct}%` : "\u2014", sub: "", subColor: "text-tertiary", accent: false },
   ] : [];
 
+  const incident = data?.activeIncident ?? null;
   const signalCards = data?.signals ?? [];
   const auditLog = data?.activity ?? [];
   const protocolSteps = data?.protocolSteps ?? [];
@@ -482,34 +496,67 @@ export default function Dashboard() {
                 <div className="md:col-span-2 p-7 bg-surface-container-low border border-outline-variant/15 rounded-xl flex flex-col justify-between">
                   <div>
                     <div className="flex items-center gap-2 mb-4">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75" />
-                        <span className="relative inline-flex h-2 w-2 rounded-full bg-error" />
-                      </span>
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.2rem] text-error">
-                        Active Incident
-                      </span>
+                      {incident ? (
+                        <>
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75" />
+                            <span className="relative inline-flex h-2 w-2 rounded-full bg-error" />
+                          </span>
+                          <span className="text-[10px] font-semibold uppercase tracking-[0.2rem] text-error">
+                            Active Incident — {incident.type.toUpperCase()} — SEV {incident.severity}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.2rem] text-on-surface-variant">
+                          No Active Incident
+                        </span>
+                      )}
                     </div>
                     <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2 text-on-surface">
-                      No Active Incident
+                      {incident?.title ?? "Awaiting Incident Data"}
                     </h2>
                     <p className="text-on-surface-variant text-sm leading-relaxed max-w-md">
-                      No incident data available. Signals and field reports will appear here when an incident is active.
+                      {incident?.description ?? "Report a field signal or use the AI assistant to begin incident tracking."}
                     </p>
+                    {incident?.location && (
+                      <p className="text-on-surface-variant text-xs mt-2 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[14px]">location_on</span>
+                        {incident.location}
+                      </p>
+                    )}
                   </div>
                   <div className="mt-6 flex flex-wrap gap-3">
-                    <button
-                      className="bg-tertiary-gradient px-5 py-2 rounded-lg text-white font-semibold text-sm hover:opacity-90 transition-opacity active:scale-95"
-                      aria-label="Deploy resources to incident"
-                    >
-                      Deploy Resources
-                    </button>
-                    <button
-                      className="px-5 py-2 bg-secondary-container text-on-secondary-container font-semibold text-sm rounded-lg hover:bg-surface-bright transition-colors"
-                      aria-label="Generate incident report"
-                    >
-                      Generate Report
-                    </button>
+                    {incident ? (
+                      <>
+                        <button
+                          onClick={() => {
+                            setChatOpen(true);
+                            setChatInput(`Deploy resources for incident "${incident.title}" (ID: ${incident.id}). Assess resource needs and recommend dispatch.`);
+                          }}
+                          className="bg-tertiary-gradient px-5 py-2 rounded-lg text-white font-semibold text-sm flex items-center gap-2 hover:opacity-90 transition-opacity active:scale-95"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">emergency</span>
+                          Deploy Resources
+                        </button>
+                        <button
+                          onClick={() => {
+                            setChatOpen(true);
+                            setChatInput(`Generate an ICS-209 incident status summary report for "${incident.title}" (ID: ${incident.id}, type: ${incident.type}, severity: ${incident.severity}). Include situation summary, resource needs, and recommended actions.`);
+                          }}
+                          className="px-5 py-2 bg-secondary-container text-on-secondary-container font-semibold text-sm rounded-lg hover:bg-surface-bright transition-colors"
+                        >
+                          Generate Report
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => setSignalModalOpen(true)}
+                        className="bg-tertiary-gradient px-5 py-2 rounded-lg text-white font-semibold text-sm flex items-center gap-2 hover:opacity-90 transition-opacity active:scale-95"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">cell_tower</span>
+                        Report Signal
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -520,20 +567,27 @@ export default function Dashboard() {
                       <span className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
                         Field Status
                       </span>
+                      {incident && (
+                        <span className="material-symbols-outlined text-tertiary text-[18px]">shield</span>
+                      )}
                     </div>
-                    {[
+                    {(incident ? [
+                      { label: "Severity Level", pct: incident.severity * 20, warn: incident.severity >= 4 },
+                      { label: "Signal Health", pct: data?.stats.signalHealthPct ?? 0 },
+                      { label: "Active Signals", pct: Math.min(100, signalCards.length * 20) },
+                    ] : [
                       { label: "Field Teams Active", pct: 0 },
                       { label: "Shelter Capacity", pct: 0 },
                       { label: "Comms Signal", pct: 0 },
-                    ].map((bar) => (
+                    ]).map((bar) => (
                       <div key={bar.label} className="space-y-1.5">
                         <div className="flex justify-between text-xs">
                           <span className="text-on-surface-variant">{bar.label}</span>
-                          <span className="text-on-surface">{bar.pct > 0 ? `${bar.pct}%` : "\u2014"}</span>
+                          <span className={`${'warn' in bar && bar.warn ? "text-error" : "text-on-surface"}`}>{bar.pct > 0 ? `${bar.pct}%` : "\u2014"}</span>
                         </div>
                         <div className="w-full bg-surface-container-high h-1 rounded-full overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-tertiary"
+                            className={`h-full rounded-full ${'warn' in bar && bar.warn ? "bg-error" : "bg-tertiary"}`}
                             style={{ width: `${bar.pct}%` }}
                           />
                         </div>
@@ -542,7 +596,7 @@ export default function Dashboard() {
                   </div>
                   <div className="pt-4 border-t border-outline-variant/15 mt-2">
                     <span className="text-[10px] text-on-surface-variant font-mono">
-                      STATION: EOC ALPHA // OPS: STANDBY
+                      STATION: EOC ALPHA // OPS: {incident ? "ACTIVE" : "STANDBY"}
                     </span>
                   </div>
                 </div>
@@ -691,7 +745,14 @@ export default function Dashboard() {
                         Report signals or run triage to get strategic recommendations from the AI.
                       </p>
                       <button
-                        onClick={() => prefillChat("Run triage analysis on the current situation")}
+                        onClick={() => {
+                          if (incident) {
+                            setChatOpen(true);
+                            setChatInput(`Run triage analysis on incident "${incident.title}" (ID: ${incident.id}, type: ${incident.type}, severity: ${incident.severity}). Assess root cause, blast radius, affected population, and recommend immediate actions. Push your findings to the dashboard recommendation panel and set a response protocol.`);
+                          } else {
+                            prefillChat("Analyze the current situation and provide triage recommendations. Push your findings to the dashboard.");
+                          }
+                        }}
                         className="px-4 py-2 rounded-lg bg-secondary-container text-on-secondary-container font-semibold text-xs hover:bg-surface-bright transition-colors flex items-center gap-2"
                       >
                         <span className="material-symbols-outlined text-[14px]">neurology</span>
@@ -950,7 +1011,13 @@ export default function Dashboard() {
               Report field signal
             </button>
             <button
-              onClick={() => { setChatInput("Run triage analysis on the current situation"); }}
+              onClick={() => {
+                if (incident) {
+                  setChatInput(`Run triage on incident "${incident.title}" (ID: ${incident.id}, type: ${incident.type}, severity: ${incident.severity}). Use pushRecommendation and setResponseProtocol to update the dashboard.`);
+                } else {
+                  setChatInput("Run triage analysis on the current situation. Push findings to the dashboard.");
+                }
+              }}
               disabled={chatStatus !== "ready"}
               className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-lowest text-[10px] font-semibold text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors disabled:opacity-30"
             >
