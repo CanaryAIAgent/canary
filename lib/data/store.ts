@@ -326,20 +326,20 @@ export async function syncDashboardFromDb(): Promise<DashboardData> {
       if (signals.length > 20) signals.length = 20;
     }
 
-    // Merge DB activity with in-memory (prepend DB logs that aren't already there)
+    // Rebuild activity from DB logs + in-memory entries
     if (recentLogs.length > 0) {
-      const existingActions = new Set(activity.map((a) => a.action));
-      for (const log of recentLogs) {
-        const action = log.decisionRationale.slice(0, 120);
-        if (!existingActions.has(action)) {
-          activity.push({
-            id: `db-act-${log.id.slice(0, 8)}`,
-            actor: log.agentType,
-            action,
-            time: timeSince(log.timestamp),
-          });
-        }
-      }
+      const dbEntries: ActivityEntry[] = recentLogs.map((log) => ({
+        id: `db-act-${log.id.slice(0, 8)}`,
+        actor: log.agentType,
+        action: log.decisionRationale.slice(0, 120),
+        time: timeSince(log.timestamp),
+      }));
+      // Keep in-memory entries not duplicated in DB (by checking action text overlap)
+      const dbActions = new Set(dbEntries.map((e) => e.action));
+      const memOnly = activity.filter((a) => !a.id.startsWith('db-act-') && !dbActions.has(a.action));
+      activity.length = 0;
+      // DB entries first (newest first — already sorted by timestamp desc), then mem-only
+      activity.push(...dbEntries, ...memOnly);
       if (activity.length > 50) activity.length = 50;
     }
 

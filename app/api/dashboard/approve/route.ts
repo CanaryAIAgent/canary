@@ -8,7 +8,7 @@
  */
 
 import { dbListIncidents, dbUpdateIncident, dbInsertAgentLog } from '@/lib/db';
-import { addActivity } from '@/lib/data/store';
+import { addActivity, advanceProtocol, protocolSteps } from '@/lib/data/store';
 
 export async function POST(req: Request) {
   try {
@@ -56,6 +56,10 @@ export async function POST(req: Request) {
 
     // Update in-memory activity feed so it shows immediately
     addActivity('Incident Commander', `Approved dispatch for "${target.title}" — status → responding`);
+
+    // Advance the first pending protocol step
+    const pendingStep = protocolSteps.find((s) => !s.done);
+    if (pendingStep) advanceProtocol(pendingStep.id);
 
     return Response.json({
       success: true,
