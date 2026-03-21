@@ -104,3 +104,11 @@ export function getPhotoModel(model: PhotoModel = 'flash') {
   const def = PHOTO_MODELS[model];
   return resolveModel(def.modelId, def.gatewayId);
 }
+
+/**
+ * Get a model for video analysis.
+ * Uses Gemini 2.5 Flash (supports video input natively).
+ */
+export function getVideoModel() {
+  return resolveModel('gemini-2.5-flash', 'google/gemini-2.5-flash');
+}

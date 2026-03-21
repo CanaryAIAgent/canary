@@ -561,6 +561,28 @@ export const VoiceAnalysisResponseSchema = AIAnalysisSchema.extend({
 });
 export type VoiceAnalysisResponse = z.infer<typeof VoiceAnalysisResponseSchema>;
 
+// Video analysis response
+export const VideoTimestampEventSchema = z.object({
+  timestamp: z.string().describe('Timestamp in HH:MM:SS or MM:SS format'),
+  seconds: z.number().describe('Timestamp in total seconds from start'),
+  event: z.string().describe('Description of what happened at this timestamp'),
+  severity: SeverityLevelSchema.describe('Severity of this specific event'),
+  category: z.string().describe('Category: damage, hazard, movement, structural, environmental, human_activity, other'),
+});
+export type VideoTimestampEvent = z.infer<typeof VideoTimestampEventSchema>;
+
+export const VideoAnalysisResponseSchema = AIAnalysisSchema.extend({
+  timeline: z.array(VideoTimestampEventSchema).describe('Chronological list of significant events with timestamps'),
+  damageCategory: z.string().optional().describe('e.g. ATC-45 rapid assessment category'),
+  structuralIntegrity: z.enum(['intact', 'moderate_damage', 'severe_damage', 'destroyed']).optional(),
+  detectedObjects: z.array(z.string()).default([]),
+  extractedAddress: z.string().optional(),
+  videoDurationSeconds: z.number().optional(),
+  sceneSummary: z.string().describe('Overall scene description covering the entire video'),
+  progressionAnalysis: z.string().optional().describe('How the situation changes over the course of the video'),
+});
+export type VideoAnalysisResponse = z.infer<typeof VideoAnalysisResponseSchema>;
+
 // Photo analysis response
 export const PhotoAnalysisResponseSchema = AIAnalysisSchema.extend({
   damageCategory: z.string().optional().describe('e.g. ATC-45 rapid assessment category'),
