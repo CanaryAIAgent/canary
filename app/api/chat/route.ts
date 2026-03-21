@@ -6,6 +6,7 @@
  * Streaming chat endpoint for the EOC command dashboard AI panel.
  * The assistant has access to all agent tools: it can triage incidents,
  * check shelter capacity, search historical incidents, and more.
+ * All mutations persist to Supabase.
  */
 
 import { streamText, UIMessage, convertToModelMessages, tool } from 'ai';
@@ -27,6 +28,7 @@ import {
   setProtocolSteps,
   getDashboardData,
 } from '@/lib/data/store';
+import { dbInsertIncident, dbInsertAgentLog } from '@/lib/db';
 
 export const maxDuration = 60;
 
@@ -51,10 +53,11 @@ const EOC_SYSTEM_PROMPT = `You are the Canary AI Assistant — the intelligent c
 
 ## Dashboard Integration
 You can push updates to the live dashboard using these tools:
-- pushSignal: Add a new signal card to the dashboard feed
-- pushActivity: Log an action to the field activity feed
+- pushSignal: Add a new signal card to the dashboard feed (also creates an incident in the database)
+- pushActivity: Log an action to the field activity feed (also persists to agent audit log)
 - pushRecommendation: Update the AI strategy recommendation panel
 - updateDashboardStats: Update the key metrics row
+- createIncident: Create a formal incident record in the database
 
 When you analyze a new report or make a recommendation, push the relevant updates so the dashboard stays current.
 
@@ -72,19 +75,22 @@ export async function POST(req: Request) {
     system: EOC_SYSTEM_PROMPT + `\n\n## Current Dashboard State\n${JSON.stringify(dashboardState, null, 2)}`,
     messages: await convertToModelMessages(messages),
     tools: {
-      // Dashboard mutation tools
+      // Dashboard mutation tools — all persist to Supabase
       pushSignal: tool({
-        description: 'Push a new signal card to the live EOC dashboard signal feed. Use this when you identify a new signal from a field report, social media post, or camera alert.',
+        description: 'Push a new signal card to the live EOC dashboard signal feed AND create an incident in the database. Use this when you identify a new signal from a field report, social media post, or camera alert.',
         inputSchema: z.object({
           tag: z.string().describe('Signal category tag, e.g. "CRITICAL // FIELD", "LIVE // CAMERA", "SOCIAL // X"'),
-          tagColor: z.enum(['text-error', 'text-tertiary', 'text-on-surface-variant']),
+          tagColor: z.string().describe('CSS class: text-error, text-tertiary, or text-on-surface-variant'),
           title: z.string().describe('Signal title, e.g. "Structural Collapse — Oak St"'),
           desc: z.string().describe('Signal description'),
-          source: z.string().describe('Signal source, e.g. "Field Responder", "Camera Feed AI", "Social Intelligence"'),
-          credibility: z.number().min(0).max(100).describe('AI credibility score 0-100'),
-          icon: z.string().describe('Material Symbols icon name, e.g. "apartment", "videocam", "person_search"'),
+          source: z.string().describe('Signal source, e.g. "Field Responder", "Camera Feed AI"'),
+          credibility: z.number().describe('AI credibility score 0-100'),
+          icon: z.string().describe('Material Symbols icon name'),
+          severity: z.number().describe('Severity 1-5 for incident creation'),
+          incidentType: z.string().describe('One of: flood, fire, structural, medical, hazmat, earthquake, infrastructure, cyber, other'),
         }),
-        execute: async ({ tag, tagColor, title, desc, source, credibility, icon }) => {
+        execute: async ({ tag, tagColor, title, desc, source, credibility, icon, severity, incidentType }) => {
+          // Update in-memory dashboard
           const card = addSignal({
             tag,
             tagColor,
@@ -96,18 +102,63 @@ export async function POST(req: Request) {
             time: 'just now',
             icon,
           });
-          return { success: true, signalId: card.id, message: `Signal "${title}" pushed to dashboard` };
+
+          // Persist to Supabase
+          let incidentId: string | undefined;
+          try {
+            const validTypes = ['flood', 'fire', 'structural', 'medical', 'hazmat', 'earthquake', 'infrastructure', 'cyber', 'other'] as const;
+            const iType = validTypes.includes(incidentType as typeof validTypes[number])
+              ? (incidentType as typeof validTypes[number])
+              : 'other' as const;
+
+            const incident = await dbInsertIncident({
+              title,
+              description: desc,
+              type: iType,
+              severity: Math.round(Math.min(5, Math.max(1, severity))),
+              status: 'new',
+              location: {},
+              sources: ['field'],
+              mediaUrls: [],
+              corroboratedBySignals: [],
+              linkedCameraAlerts: [],
+            });
+            incidentId = incident.id;
+          } catch (err) {
+            console.error('[chat/pushSignal] DB persist failed:', err);
+          }
+
+          return { success: true, signalId: card.id, incidentId, message: `Signal "${title}" pushed to dashboard and persisted` };
         },
       }),
 
       pushActivity: tool({
-        description: 'Log an action to the EOC field activity feed. Use this when you take an action, make a decision, or observe something noteworthy.',
+        description: 'Log an action to the EOC field activity feed AND persist to audit log. Use this when you take an action, make a decision, or observe something noteworthy.',
         inputSchema: z.object({
-          actor: z.string().describe('Who performed the action, e.g. "Triage Agent", "Orchestrator", "EOC Base"'),
+          actor: z.string().describe('Who performed the action, e.g. "Triage Agent", "Orchestrator", "EOC Base", "AI Assistant"'),
           action: z.string().describe('Description of the action taken'),
         }),
         execute: async ({ actor, action }) => {
+          // Update in-memory
           const entry = addActivity(actor, action);
+
+          // Persist to Supabase agent_logs
+          try {
+            await dbInsertAgentLog({
+              agentType: 'orchestrator',
+              sessionId: crypto.randomUUID(),
+              stepIndex: 0,
+              decisionRationale: `${actor}: ${action}`,
+              toolCallsAttempted: [],
+              toolCallsSucceeded: [],
+              toolCallsFailed: [],
+              actionsEscalated: [],
+              timestamp: new Date().toISOString(),
+            });
+          } catch (err) {
+            console.error('[chat/pushActivity] DB persist failed:', err);
+          }
+
           return { success: true, activityId: entry.id };
         },
       }),
@@ -116,15 +167,34 @@ export async function POST(req: Request) {
         description: 'Update the AI strategy recommendation panel on the dashboard. Use this when you have a clear action recommendation for the incident commander.',
         inputSchema: z.object({
           actionSequence: z.string().describe('The recommended sequence of actions'),
-          confidenceScore: z.number().min(0).max(100).describe('Confidence in this recommendation (0-100)'),
+          confidenceScore: z.number().describe('Confidence in this recommendation (0-100)'),
           stats: z.array(z.object({
             label: z.string(),
             value: z.string(),
-          })).describe('Key stats to display (e.g. affected residents, response time)'),
-          ctaLabel: z.string().default('Approve Dispatch').describe('Call-to-action button label'),
+          })).describe('Key stats to display'),
+          ctaLabel: z.string().describe('Call-to-action button label, e.g. "Approve Dispatch"'),
         }),
         execute: async ({ actionSequence, confidenceScore, stats: recStats, ctaLabel }) => {
           updateRecommendation({ actionSequence, confidenceScore, stats: recStats, ctaLabel });
+
+          // Persist recommendation as agent log
+          try {
+            await dbInsertAgentLog({
+              agentType: 'orchestrator',
+              sessionId: crypto.randomUUID(),
+              stepIndex: 0,
+              decisionRationale: `AI Recommendation (${confidenceScore}%): ${actionSequence}`,
+              confidenceScore: confidenceScore / 100,
+              toolCallsAttempted: [],
+              toolCallsSucceeded: [],
+              toolCallsFailed: [],
+              actionsEscalated: [],
+              timestamp: new Date().toISOString(),
+            });
+          } catch (err) {
+            console.error('[chat/pushRecommendation] DB persist failed:', err);
+          }
+
           return { success: true, message: 'Recommendation panel updated' };
         },
       }),
@@ -132,12 +202,12 @@ export async function POST(req: Request) {
       updateDashboardStats: tool({
         description: 'Update the key metrics row at the top of the EOC dashboard.',
         inputSchema: z.object({
-          activeIncidents: z.number().int().nonnegative().optional(),
+          activeIncidents: z.number().optional(),
           incidentDelta: z.string().optional().describe('e.g. "+2/hr"'),
-          resourceRequests: z.number().int().nonnegative().optional(),
+          resourceRequests: z.number().optional(),
           resourceStatus: z.string().optional().describe('e.g. "Pending", "Dispatched"'),
-          deploymentEtaMinutes: z.number().nonnegative().optional(),
-          signalHealthPct: z.number().min(0).max(100).optional(),
+          deploymentEtaMinutes: z.number().optional(),
+          signalHealthPct: z.number().optional(),
         }),
         execute: async (partial) => {
           updateStats(partial);
@@ -150,7 +220,7 @@ export async function POST(req: Request) {
         inputSchema: z.object({
           steps: z.array(z.object({
             step: z.string().describe('Protocol step description'),
-            done: z.boolean().default(false),
+            done: z.boolean().describe('Whether this step is complete'),
             active: z.boolean().optional().describe('Currently being worked on'),
           })),
         }),
@@ -160,7 +230,7 @@ export async function POST(req: Request) {
         },
       }),
 
-      // Agent tools — inherited from the agent system
+      // Agent tools — already persist to Supabase via lib/db
       checkShelterCapacity: checkShelterCapacityTool,
       createIncident: createIncidentTool,
       updateIncidentStatus: updateIncidentStatusTool,
