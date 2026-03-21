@@ -39,6 +39,23 @@ interface Incident {
   aiAnalysis?: Record<string, unknown>;
 }
 
+interface PhotoAnalysisData {
+  type: 'photo_analysis';
+  imagesProcessed: number;
+  analysis: {
+    summary?: string;
+    severity?: number;
+    confidence?: number;
+    hazards?: string[];
+    structuralIntegrity?: string;
+    damageCategory?: string;
+    detectedObjects?: string[];
+    extractedAddress?: string;
+    recommendedActions?: string[];
+    resourceRecommendations?: Array<{ type: string; priority: string; quantity?: number }>;
+  };
+}
+
 interface AgentLog {
   id: string;
   agentType: string;
@@ -47,6 +64,16 @@ interface AgentLog {
   stepIndex: number;
   decisionRationale: string;
   timestamp: string;
+  rawStepJson: string | null;
+}
+
+function parseAnalysisData(raw: string | null): PhotoAnalysisData | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed?.type === 'photo_analysis') return parsed as PhotoAnalysisData;
+  } catch { /* ignore */ }
+  return null;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -114,7 +141,17 @@ export default function IncidentDetailPage() {
   const [chatInput, setChatInput] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [publicUrl, setPublicUrl] = useState<string | null>(null);
+  const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const toggleLogExpand = (logId: string) => {
+    setExpandedLogs((prev) => {
+      const next = new Set(prev);
+      if (next.has(logId)) next.delete(logId);
+      else next.add(logId);
+      return next;
+    });
+  };
 
   // AI Chat scoped to this incident
   const { messages: chatMessages, sendMessage, status: chatStatus } = useChat({
@@ -434,35 +471,174 @@ export default function IncidentDetailPage() {
                     </p>
                   </div>
                 ) : (
-                  agentLogs.map((log) => (
-                    <div
-                      key={log.id}
-                      className="flex gap-3 items-start p-3 rounded-lg hover:bg-surface-container-high transition-colors"
-                    >
-                      <div className="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0 mt-0.5">
-                        <span className="material-symbols-outlined text-[14px] text-on-surface-variant">
-                          {log.agentType === "orchestrator"
-                            ? "hub"
-                            : log.agentType === "triage"
-                            ? "troubleshoot"
-                            : "smart_toy"}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-bold text-on-surface uppercase tracking-wide">
-                            {log.agentType}
-                          </span>
-                          <span className="text-[10px] text-on-surface-variant font-mono">
-                            {timeSince(log.timestamp)}
-                          </span>
+                  agentLogs.map((log) => {
+                    const analysisData = parseAnalysisData(log.rawStepJson);
+                    const hasExpandable = analysisData != null;
+                    const isExpanded = expandedLogs.has(log.id);
+
+                    return (
+                      <div key={log.id} className="rounded-lg overflow-hidden">
+                        {/* Log header — clickable if expandable */}
+                        <div
+                          className={`flex gap-3 items-start p-3 transition-colors ${
+                            hasExpandable
+                              ? "cursor-pointer hover:bg-surface-container-high"
+                              : "hover:bg-surface-container-high"
+                          }`}
+                          onClick={hasExpandable ? () => toggleLogExpand(log.id) : undefined}
+                        >
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                            hasExpandable ? "bg-tertiary/15" : "bg-surface-container-highest"
+                          }`}>
+                            <span className={`material-symbols-outlined text-[14px] ${
+                              hasExpandable ? "text-tertiary" : "text-on-surface-variant"
+                            }`}>
+                              {hasExpandable
+                                ? "photo_camera"
+                                : log.agentType === "orchestrator"
+                                ? "hub"
+                                : log.agentType === "triage"
+                                ? "troubleshoot"
+                                : "smart_toy"}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-bold text-on-surface uppercase tracking-wide">
+                                {hasExpandable ? "Photo Analysis" : log.agentType}
+                              </span>
+                              <span className="text-[10px] text-on-surface-variant font-mono">
+                                {timeSince(log.timestamp)}
+                              </span>
+                              {hasExpandable && (
+                                <span className="material-symbols-outlined text-[14px] text-on-surface-variant ml-auto transition-transform" style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>
+                                  expand_more
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-on-surface-variant leading-relaxed">
+                              {log.decisionRationale}
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-xs text-on-surface-variant leading-relaxed">
-                          {log.decisionRationale}
-                        </p>
+
+                        {/* Expandable analysis details */}
+                        {hasExpandable && isExpanded && analysisData && (
+                          <div className="mx-3 mb-3 p-4 bg-surface-container-lowest rounded-lg border border-outline-variant/15 space-y-4 animate-in fade-in duration-200">
+                            {/* Summary */}
+                            {analysisData.analysis.summary && (
+                              <div>
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Summary</span>
+                                <p className="text-sm text-on-surface mt-1">{analysisData.analysis.summary}</p>
+                              </div>
+                            )}
+
+                            {/* Key metrics row */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                              {analysisData.analysis.severity != null && (
+                                <div className="p-2 bg-surface-container-low rounded-lg">
+                                  <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Severity</span>
+                                  <p className={`text-lg font-bold mt-0.5 ${(analysisData.analysis.severity ?? 0) >= 4 ? "text-error" : "text-on-surface"}`}>
+                                    {analysisData.analysis.severity}/5
+                                  </p>
+                                </div>
+                              )}
+                              {analysisData.analysis.confidence != null && (
+                                <div className="p-2 bg-surface-container-low rounded-lg">
+                                  <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Confidence</span>
+                                  <p className="text-lg font-bold mt-0.5 text-tertiary">{Math.round(analysisData.analysis.confidence * 100)}%</p>
+                                </div>
+                              )}
+                              {analysisData.analysis.structuralIntegrity && (
+                                <div className="p-2 bg-surface-container-low rounded-lg">
+                                  <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Structure</span>
+                                  <p className="text-xs font-semibold mt-1 text-on-surface">{analysisData.analysis.structuralIntegrity.replace(/_/g, " ")}</p>
+                                </div>
+                              )}
+                              {analysisData.analysis.damageCategory && (
+                                <div className="p-2 bg-surface-container-low rounded-lg">
+                                  <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Damage</span>
+                                  <p className="text-xs font-semibold mt-1 text-on-surface">{analysisData.analysis.damageCategory}</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Hazards */}
+                            {(analysisData.analysis.hazards?.length ?? 0) > 0 && (
+                              <div>
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Detected Hazards</span>
+                                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                  {analysisData.analysis.hazards!.map((h, i) => (
+                                    <span key={i} className="px-2 py-0.5 text-[10px] font-semibold bg-error/10 text-error rounded-full">
+                                      {h}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Detected objects */}
+                            {(analysisData.analysis.detectedObjects?.length ?? 0) > 0 && (
+                              <div>
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Detected Objects</span>
+                                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                  {analysisData.analysis.detectedObjects!.map((o, i) => (
+                                    <span key={i} className="px-2 py-0.5 text-[10px] font-semibold bg-surface-container-high text-on-surface-variant rounded-full">
+                                      {o}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Recommended actions */}
+                            {(analysisData.analysis.recommendedActions?.length ?? 0) > 0 && (
+                              <div>
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Recommended Actions</span>
+                                <ul className="mt-1.5 space-y-1">
+                                  {analysisData.analysis.recommendedActions!.map((a, i) => (
+                                    <li key={i} className="flex items-start gap-2 text-xs text-on-surface">
+                                      <span className="text-tertiary mt-0.5">•</span>
+                                      {a}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {/* Resource recommendations */}
+                            {(analysisData.analysis.resourceRecommendations?.length ?? 0) > 0 && (
+                              <div>
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Resource Needs</span>
+                                <div className="mt-1.5 space-y-1">
+                                  {analysisData.analysis.resourceRecommendations!.map((r, i) => (
+                                    <div key={i} className="flex items-center justify-between text-xs p-1.5 bg-surface-container-low rounded">
+                                      <span className="text-on-surface font-medium">{r.type}</span>
+                                      <span className={`text-[10px] font-bold uppercase ${r.priority === "immediate" ? "text-error" : r.priority === "urgent" ? "text-tertiary" : "text-on-surface-variant"}`}>
+                                        {r.priority}{r.quantity ? ` × ${r.quantity}` : ""}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Location */}
+                            {analysisData.analysis.extractedAddress && (
+                              <div className="flex items-center gap-1.5 text-xs text-on-surface-variant">
+                                <span className="material-symbols-outlined text-[14px]">location_on</span>
+                                {analysisData.analysis.extractedAddress}
+                              </div>
+                            )}
+
+                            <div className="text-[10px] text-on-surface-variant/50 pt-2 border-t border-outline-variant/10">
+                              {analysisData.imagesProcessed} image{analysisData.imagesProcessed !== 1 ? "s" : ""} analyzed
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>

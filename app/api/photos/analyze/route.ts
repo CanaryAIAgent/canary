@@ -14,6 +14,7 @@ import {
   dbInsertIncident,
   dbGetIncident,
   dbUpdateIncident,
+  dbInsertAgentLog,
 } from '@/lib/db';
 import { PhotoAnalysisResponseSchema } from '@/lib/schemas';
 import { addSignal, addActivity, updateStats, stats } from '@/lib/data/store';
@@ -152,6 +153,30 @@ export async function POST(request: Request) {
       'Photo Analyzer',
       `Analyzed ${images.length} photo(s) for incident "${title || existingIncident?.title}" — severity ${finalSeverity}, ${analysis.hazards?.length ?? 0} hazards detected`,
     );
+
+    // Persist full analysis to agent_logs so it can be viewed later on the incident page
+    try {
+      await dbInsertAgentLog({
+        agentType: 'triage',
+        incidentId: resultIncidentId,
+        sessionId: crypto.randomUUID(),
+        stepIndex: 0,
+        decisionRationale: `Photo Analysis: ${analysis.summary ?? 'Image analyzed'}. Severity: ${finalSeverity}. Hazards: ${(analysis.hazards ?? []).join(', ') || 'none detected'}.`,
+        confidenceScore: analysis.confidence ?? null,
+        toolCallsAttempted: ['photo_analysis'],
+        toolCallsSucceeded: ['photo_analysis'],
+        toolCallsFailed: [],
+        actionsEscalated: [],
+        rawStepJson: JSON.stringify({
+          type: 'photo_analysis',
+          imagesProcessed: images.length,
+          analysis,
+        }),
+        timestamp: new Date().toISOString(),
+      });
+    } catch (logErr) {
+      console.error('[photos/analyze] agent log persist failed (non-fatal):', logErr);
+    }
 
     if (isNewIncident) {
       updateStats({

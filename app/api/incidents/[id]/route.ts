@@ -3,7 +3,8 @@
  *
  * GET /api/incidents/[id]
  *
- * Returns a single incident from Supabase with its recent agent_logs.
+ * Returns a single incident from Supabase with its agent_logs
+ * (including raw_step_json for expandable analysis views).
  */
 
 import { NextRequest } from 'next/server';
@@ -25,12 +26,11 @@ export async function GET(
       );
     }
 
-    // Fetch agent logs for this incident
-    const allLogs = await dbListAgentLogs({ limit: 50 });
-    const incidentLogs = allLogs.filter((log) => log.incidentId === id);
+    // Fetch agent logs scoped to this incident
+    const agentLogs = await dbListAgentLogs({ incidentId: id, limit: 100 });
 
     return Response.json(
-      { incident, agentLogs: incidentLogs },
+      { incident, agentLogs },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (err) {

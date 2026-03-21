@@ -251,14 +251,17 @@ export async function dbInsertAgentLog(log: Omit<AgentLog, 'id'>): Promise<void>
 export async function dbListAgentLogs(filters?: {
   limit?: number;
   since?: string;
+  incidentId?: string;
 }): Promise<Array<{
   id: string; agentType: string; incidentId: string | null;
-  sessionId: string; stepIndex: number; decisionRationale: string; timestamp: string;
+  sessionId: string; stepIndex: number; decisionRationale: string;
+  timestamp: string; rawStepJson: string | null;
 }>> {
   let query = supabase
     .from('agent_logs')
-    .select('id, agent_type, incident_id, session_id, step_index, decision_rationale, timestamp')
+    .select('id, agent_type, incident_id, session_id, step_index, decision_rationale, timestamp, raw_step_json')
     .order('timestamp', { ascending: false });
+  if (filters?.incidentId) query = query.eq('incident_id', filters.incidentId);
   if (filters?.since) query = query.gte('timestamp', filters.since);
   if (filters?.limit) query = query.limit(filters.limit);
   const { data: rows, error } = await query;
@@ -267,6 +270,7 @@ export async function dbListAgentLogs(filters?: {
     id: r.id, agentType: r.agent_type, incidentId: r.incident_id ?? null,
     sessionId: r.session_id, stepIndex: r.step_index,
     decisionRationale: r.decision_rationale, timestamp: r.timestamp,
+    rawStepJson: r.raw_step_json ?? null,
   }));
 }
 
