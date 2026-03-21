@@ -144,6 +144,14 @@ export default function IncidentDetailPage() {
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Swarm state
+  const [swarmRunning, setSwarmRunning] = useState(false);
+  const [swarmResults, setSwarmResults] = useState<{
+    insurance?: { status: string; url?: string };
+    emergency?: { status: string; url?: string };
+    research?: { status: string; url?: string };
+  } | null>(null);
+
   const toggleLogExpand = (logId: string) => {
     setExpandedLogs((prev) => {
       const next = new Set(prev);
@@ -177,6 +185,15 @@ export default function IncidentDetailPage() {
         const ai = json.incident?.aiAnalysis as Record<string, unknown> | undefined;
         if (ai?.publicSummary) {
           setPublicUrl(`/status/${incidentId}`);
+        }
+        // Detect existing swarm reports
+        const swarm = ai?.swarmReports as Record<string, unknown> | undefined;
+        if (swarm) {
+          const results: typeof swarmResults = {};
+          if (swarm.insurance) results.insurance = { status: "success", url: `/reports/${incidentId}/insurance` };
+          if (swarm.emergency) results.emergency = { status: "success", url: `/reports/${incidentId}/emergency` };
+          if (swarm.research) results.research = { status: "success", url: `/reports/${incidentId}/research` };
+          if (Object.keys(results).length > 0) setSwarmResults(results);
         }
         setError(false);
       } catch {
@@ -226,6 +243,38 @@ export default function IncidentDetailPage() {
       console.error("[unpublish] failed");
     } finally {
       setPublishing(false);
+    }
+  };
+
+  // Swarm handler
+  const handleSwarm = async () => {
+    if (!incidentId || swarmRunning) return;
+    setSwarmRunning(true);
+    setSwarmResults({
+      insurance: { status: "running" },
+      emergency: { status: "running" },
+      research: { status: "running" },
+    });
+    try {
+      const res = await fetch(`/api/incidents/${incidentId}/swarm`, { method: "POST" });
+      const json = await res.json();
+      if (json.success) {
+        setSwarmResults(json.data.reports);
+      } else {
+        setSwarmResults({
+          insurance: { status: "error" },
+          emergency: { status: "error" },
+          research: { status: "error" },
+        });
+      }
+    } catch {
+      setSwarmResults({
+        insurance: { status: "error" },
+        emergency: { status: "error" },
+        research: { status: "error" },
+      });
+    } finally {
+      setSwarmRunning(false);
     }
   };
 
@@ -442,6 +491,123 @@ export default function IncidentDetailPage() {
                 </button>
               )}
             </div>
+          </div>
+        </section>
+
+        {/* ── Multi-Agent Swarm ─────────────────────────── */}
+        <section className="mb-10">
+          <div className="bg-surface-container-high border border-outline-variant/20 rounded-2xl p-7 shadow-[0_0_32px_0_rgba(231,229,228,0.08)]">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-tertiary/10 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-tertiary text-[20px]">hub</span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-on-surface">Multi-Agent Swarm</p>
+                  <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">
+                    3 specialized agents — parallel execution
+                  </p>
+                </div>
+              </div>
+              {!swarmResults && (
+                <button
+                  onClick={handleSwarm}
+                  disabled={swarmRunning}
+                  className="bg-tertiary-gradient px-5 py-2.5 rounded-lg text-white font-bold text-sm flex items-center gap-2 hover:opacity-90 transition-opacity active:scale-95 disabled:opacity-40 tracking-wider uppercase"
+                >
+                  {swarmRunning ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Running Agents…
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[16px]">rocket_launch</span>
+                      Launch Swarm
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
+            {/* Agent cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {([
+                { key: "insurance" as const, icon: "shield", label: "Insurance Report", desc: "Claims documentation & damage estimates" },
+                { key: "emergency" as const, icon: "emergency", label: "Emergency Guidance", desc: "Public safety instructions & evacuation" },
+                { key: "research" as const, icon: "travel_explore", label: "Similar Incidents", desc: "Historical analysis & response strategies" },
+              ]).map((agent) => {
+                const result = swarmResults?.[agent.key];
+                return (
+                  <div
+                    key={agent.key}
+                    className={`rounded-xl p-5 border transition-colors ${
+                      result?.status === "success"
+                        ? "bg-tertiary/5 border-tertiary/20"
+                        : result?.status === "running"
+                        ? "bg-surface-container-lowest border-outline-variant/15 animate-pulse"
+                        : result?.status === "error"
+                        ? "bg-error/5 border-error/20"
+                        : "bg-surface-container-lowest border-outline-variant/15"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        result?.status === "success" ? "bg-tertiary/15" : result?.status === "error" ? "bg-error/15" : "bg-surface-container-highest"
+                      }`}>
+                        {result?.status === "running" ? (
+                          <span className="w-4 h-4 border-2 border-tertiary/30 border-t-tertiary rounded-full animate-spin" />
+                        ) : result?.status === "success" ? (
+                          <span className="material-symbols-outlined text-tertiary text-[16px]">check_circle</span>
+                        ) : result?.status === "error" ? (
+                          <span className="material-symbols-outlined text-error text-[16px]">error</span>
+                        ) : (
+                          <span className="material-symbols-outlined text-on-surface-variant text-[16px]">{agent.icon}</span>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-on-surface">{agent.label}</p>
+                        <p className="text-[10px] text-on-surface-variant">{agent.desc}</p>
+                      </div>
+                    </div>
+                    {result?.status === "success" && result.url && (
+                      <Link
+                        href={result.url}
+                        className="flex items-center gap-1.5 text-xs font-semibold text-tertiary hover:underline"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                        View Report
+                      </Link>
+                    )}
+                    {result?.status === "running" && (
+                      <p className="text-[10px] text-tertiary font-semibold uppercase tracking-widest">Analyzing…</p>
+                    )}
+                    {result?.status === "error" && (
+                      <p className="text-[10px] text-error font-semibold">Agent failed</p>
+                    )}
+                    {!result && (
+                      <p className="text-[10px] text-on-surface-variant">Ready to launch</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Re-run button if already completed */}
+            {swarmResults && !swarmRunning && (
+              <div className="mt-4 pt-4 border-t border-outline-variant/15 flex items-center justify-between">
+                <span className="text-[10px] text-on-surface-variant font-mono">
+                  {Object.values(swarmResults).filter(r => r?.status === "success").length}/3 reports generated
+                </span>
+                <button
+                  onClick={handleSwarm}
+                  className="text-xs font-semibold text-tertiary hover:underline flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-[14px]">refresh</span>
+                  Re-run Swarm
+                </button>
+              </div>
+            )}
           </div>
         </section>
 
