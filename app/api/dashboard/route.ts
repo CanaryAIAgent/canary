@@ -3,14 +3,20 @@
  *
  * GET /api/dashboard
  *
- * Returns all in-memory EOC dashboard data: stats, signals, activity log,
- * protocol steps, and AI recommendation. Always fresh — no caching.
+ * Returns EOC dashboard data hydrated from Supabase, with in-memory fallback.
+ * Always fresh — no caching.
  */
 
-import { getDashboardData } from '@/lib/data/store';
+import { getDashboardData, syncDashboardFromDb } from '@/lib/data/store';
 
 export async function GET() {
-  const data = getDashboardData();
+  let data;
+  try {
+    data = await syncDashboardFromDb();
+  } catch {
+    // Supabase unavailable — fall back to in-memory state
+    data = getDashboardData();
+  }
 
   return Response.json(data, {
     headers: {

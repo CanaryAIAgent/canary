@@ -20,47 +20,13 @@ import {
   type Incident,
   type AgentLog,
 } from '@/lib/schemas';
-
-// ---------------------------------------------------------------------------
-// Database / persistence helpers
-// Abstracted so the tool implementations stay clean.
-// In production, replace stubs with actual @vercel/postgres queries.
-// ---------------------------------------------------------------------------
-
-async function dbInsertIncident(data: Omit<Incident, 'id' | 'createdAt' | 'updatedAt'>): Promise<Incident> {
-  // Production: import { sql } from '@vercel/postgres'; await sql`INSERT INTO incidents ...`
-  const now = new Date().toISOString();
-  return {
-    id: crypto.randomUUID(),
-    createdAt: now,
-    updatedAt: now,
-    ...data,
-  } as Incident;
-}
-
-async function dbGetIncident(id: string): Promise<Incident | null> {
-  // Production: SELECT * FROM incidents WHERE id = $1
-  void id;
-  return null;
-}
-
-async function dbUpdateIncident(id: string, data: Partial<Incident>): Promise<Incident | null> {
-  // Production: UPDATE incidents SET ... WHERE id = $1 RETURNING *
-  void id;
-  void data;
-  return null;
-}
-
-async function dbInsertAgentLog(log: Omit<AgentLog, 'id'>): Promise<void> {
-  // Production: INSERT INTO agent_logs ...
-  void log;
-}
-
-async function dbGetRunbook(filters: { incidentType?: string; id?: string }): Promise<unknown> {
-  // Production: SELECT * FROM runbooks WHERE incident_type = $1 AND is_active = true
-  void filters;
-  return null;
-}
+import {
+  dbInsertIncident,
+  dbGetIncident,
+  dbUpdateIncident,
+  dbInsertAgentLog,
+  dbGetRunbook,
+} from '@/lib/db';
 
 // ---------------------------------------------------------------------------
 // checkShelterCapacity — query shelter status and available capacity

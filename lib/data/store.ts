@@ -158,3 +158,118 @@ export function getDashboardData(): DashboardData {
     aiRecommendation,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Sync from Supabase — hydrate dashboard state from real DB data
+// ---------------------------------------------------------------------------
+
+export async function syncDashboardFromDb(): Promise<DashboardData> {
+  // Dynamic import to avoid pulling Supabase into every module that imports store
+  const { dbListIncidents, dbListSocialSignals, dbListCameraAlerts, dbListAgentLogs } =
+    await import('@/lib/db');
+
+  try {
+    const activeStatuses = ['new', 'triaging', 'responding', 'escalated'];
+
+    // Run queries in parallel
+    const [activeIncidents, recentSignals, recentAlerts, recentLogs] = await Promise.all([
+      dbListIncidents({ status: activeStatuses, limit: 100 }),
+      dbListSocialSignals({ limit: 10 }),
+      dbListCameraAlerts({ limit: 10 }),
+      dbListAgentLogs({ limit: 20 }),
+    ]);
+
+    // Update stats
+    updateStats({
+      activeIncidents: activeIncidents.length,
+      incidentDelta: `${activeIncidents.length} active`,
+      signalHealthPct: recentSignals.length > 0 ? 100 : 0,
+    });
+
+    // Build signal cards from social signals + camera alerts
+    signals.length = 0;
+    signalCounter = 0;
+
+    for (const sig of recentSignals) {
+      const credMap: Record<string, number> = { high: 95, medium: 70, unverified: 40, disputed: 15 };
+      const colorMap: Record<string, string> = { high: 'green', medium: 'yellow', unverified: 'gray', disputed: 'red' };
+      signals.push({
+        id: `sig-${String(++signalCounter).padStart(3, '0')}`,
+        tag: sig.platform.toUpperCase(),
+        tagColor: 'blue',
+        title: sig.aiSummary ?? sig.text.slice(0, 80),
+        desc: sig.text,
+        source: `@${sig.handle}`,
+        credibility: credMap[sig.credibility] ?? 50,
+        credibilityColor: colorMap[sig.credibility] ?? 'gray',
+        time: timeSince(sig.ingestedAt),
+        icon: 'signal',
+      });
+    }
+
+    for (const alert of recentAlerts) {
+      signals.push({
+        id: `sig-${String(++signalCounter).padStart(3, '0')}`,
+        tag: 'CAMERA',
+        tagColor: 'red',
+        title: alert.detectedEvent,
+        desc: alert.aiAnalysis ?? alert.detectedEvent,
+        source: alert.cameraName,
+        credibility: Math.round(alert.confidence * 100),
+        credibilityColor: alert.confidence >= 0.8 ? 'green' : alert.confidence >= 0.5 ? 'yellow' : 'red',
+        time: timeSince(alert.createdAt),
+        icon: 'camera',
+      });
+    }
+
+    // Build activity from agent logs
+    activity.length = 0;
+    activityCounter = 0;
+
+    for (const log of recentLogs) {
+      activity.push({
+        id: `act-${String(++activityCounter).padStart(3, '0')}`,
+        actor: log.agentType,
+        action: log.decisionRationale.slice(0, 120),
+        time: timeSince(log.timestamp),
+      });
+    }
+
+    // Build protocol steps from the latest active incident's runbook steps
+    if (activeIncidents.length > 0) {
+      try {
+        const { dbGetRunbook } = await import('@/lib/db');
+        const latestIncident = activeIncidents[0];
+        const runbook = await dbGetRunbook({ incidentType: latestIncident.type });
+        if (runbook && runbook.steps.length > 0) {
+          const steps = runbook.steps.map((s) => ({
+            step: s.title,
+            done: s.status === 'completed',
+            active: s.status === 'running',
+          }));
+          setProtocolSteps(steps);
+        }
+      } catch {
+        // Runbook fetch failed — keep existing protocol steps
+      }
+    }
+  } catch (err) {
+    console.error('[syncDashboardFromDb] Error syncing from DB, using in-memory fallback:', err);
+  }
+
+  return getDashboardData();
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function timeSince(isoDate: string): string {
+  const diffMs = Date.now() - new Date(isoDate).getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return 'now';
+  if (diffMin < 60) return `${diffMin}m`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h`;
+  return `${Math.floor(diffHr / 24)}d`;
+}

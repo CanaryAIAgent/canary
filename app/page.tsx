@@ -4,8 +4,9 @@
 // Design: Monolith / Precision Studio (stitch/monolith_studio/DESIGN.md)
 // Layout: App Shell with sidebar + main content + sticky AI panel
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
 
 // ── Data shape from /api/dashboard ──────────────────────────────────────────
 
@@ -61,19 +62,235 @@ interface DashboardData {
   aiRecommendation: AiRecommendation;
 }
 
+// ── Signal Ingestion Modal ──────────────────────────────────────────────────
+
+interface IngestResult {
+  success: boolean;
+  data?: {
+    signalId: string;
+    analysis: {
+      isEmergency: boolean;
+      severity: number;
+      category: string;
+      title: string;
+      summary: string;
+      credibility: number;
+      extractedLocation?: string;
+      recommendedAction: string;
+      icon: string;
+    };
+  };
+  error?: { code: string; message: string };
+}
+
+function SignalIngestModal({
+  open,
+  onClose,
+  onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [type, setType] = useState<"field" | "social" | "camera">("field");
+  const [text, setText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<IngestResult | null>(null);
+
+  const handleSubmit = async () => {
+    if (!text.trim() || submitting) return;
+    setSubmitting(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/signals/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, text, source: type === "field" ? "Field Operator" : type === "social" ? "Social Monitor" : "Camera System" }),
+      });
+      const json: IngestResult = await res.json();
+      setResult(json);
+      if (json.success) {
+        onSuccess();
+      }
+    } catch {
+      setResult({ success: false, error: { code: "NETWORK_ERROR", message: "Failed to reach signal ingestion API" } });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleClose = () => {
+    setText("");
+    setResult(null);
+    setSubmitting(false);
+    onClose();
+  };
+
+  if (!open) return null;
+
+  const typeOptions: { value: "field" | "social" | "camera"; label: string; icon: string }[] = [
+    { value: "field", label: "Field Report", icon: "person_search" },
+    { value: "social", label: "Social Media", icon: "share" },
+    { value: "camera", label: "Camera Alert", icon: "videocam" },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
+
+      {/* Panel */}
+      <div className="relative w-[min(480px,calc(100vw-2rem))] bg-surface-container-high rounded-2xl shadow-[0_0_32px_0_rgba(231,229,228,0.08)] overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-tertiary/10 flex items-center justify-center">
+              <span className="material-symbols-outlined text-tertiary text-[18px]">cell_tower</span>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-on-surface">Report Signal</p>
+              <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">AI-analyzed ingestion</p>
+            </div>
+          </div>
+          <button onClick={handleClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest transition-colors" aria-label="Close">
+            <span className="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 pb-6 space-y-5">
+          {/* Type selector */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Signal Type</label>
+            <div className="flex gap-2">
+              {typeOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setType(opt.value)}
+                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-semibold transition-colors ${
+                    type === opt.value
+                      ? "bg-tertiary/15 text-tertiary"
+                      : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-bright"
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">{opt.icon}</span>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Text input */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Signal Content</label>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.currentTarget.value)}
+              placeholder={
+                type === "field" ? "Describe the field observation..."
+                : type === "social" ? "Paste the social media post..."
+                : "Describe the camera alert..."
+              }
+              rows={4}
+              className="w-full bg-surface-container-lowest border border-outline-variant/15 focus:border-tertiary rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/50 outline-none transition-colors resize-none"
+              disabled={submitting}
+            />
+          </div>
+
+          {/* Result */}
+          {result && (
+            <div className={`p-4 rounded-xl ${result.success ? "bg-tertiary/10" : "bg-error/10"}`}>
+              {result.success && result.data ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-tertiary text-[16px]">check_circle</span>
+                    <span className="text-xs font-bold text-tertiary uppercase tracking-widest">Signal Analyzed</span>
+                  </div>
+                  <p className="text-sm font-semibold text-on-surface">{result.data.analysis.title}</p>
+                  <p className="text-xs text-on-surface-variant">{result.data.analysis.summary}</p>
+                  <div className="flex gap-3 pt-1">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                      Severity: <span className="text-on-surface">{result.data.analysis.severity}/5</span>
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                      Action: <span className="text-on-surface">{result.data.analysis.recommendedAction}</span>
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                      Credibility: <span className="text-on-surface">{result.data.analysis.credibility}%</span>
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-error text-[16px]">error</span>
+                  <span className="text-xs text-error">{result.error?.message ?? "Analysis failed"}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Submit */}
+          <div className="flex gap-3">
+            <button
+              onClick={handleSubmit}
+              disabled={!text.trim() || submitting}
+              className="flex-1 py-3 rounded-xl bg-tertiary-gradient text-white font-bold text-sm tracking-widest uppercase disabled:opacity-30 transition-opacity active:scale-95 flex items-center justify-center gap-2"
+            >
+              {submitting ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Analyzing…
+                </>
+              ) : result?.success ? (
+                "Submit Another"
+              ) : (
+                "Analyze & Submit"
+              )}
+            </button>
+            {result?.success && (
+              <button
+                onClick={handleClose}
+                className="px-5 py-3 rounded-xl bg-secondary-container text-on-secondary-container font-semibold text-sm hover:bg-surface-bright transition-colors"
+              >
+                Done
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Metric display helper ───────────────────────────────────────────────────
+
+function formatMetricValue(value: number, padded: boolean): string {
+  if (value === 0) return "\u2014"; // em dash for zero
+  return padded ? String(value).padStart(2, "0") : String(value);
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
+  const [signalModalOpen, setSignalModalOpen] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  const refreshDashboard = useCallback(() => {
+    fetch("/api/dashboard")
+      .then((r) => r.json())
+      .then(setData)
+      .catch(() => {});
+  }, []);
+
   const { messages: chatMessages, sendMessage, status: chatStatus } = useChat({
+    transport: new DefaultChatTransport({ api: "/api/chat" }),
     onFinish: () => {
-      // Refresh dashboard data after AI responds (it may have pushed updates)
-      fetch("/api/dashboard").then((r) => r.json()).then(setData).catch(() => {});
+      refreshDashboard();
     },
   });
 
@@ -84,11 +301,13 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch('/api/dashboard');
+        const res = await fetch("/api/dashboard");
         const json = await res.json();
         setData(json);
-      } catch (e) {
-        console.error('[dashboard] fetch failed', e);
+        setFetchError(false);
+      } catch {
+        console.error("[dashboard] fetch failed");
+        setFetchError(true);
       } finally {
         setLoading(false);
       }
@@ -98,10 +317,17 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  // Quick-action handlers for chat
+  const prefillChat = (text: string) => {
+    setChatInput(text);
+    setChatOpen(true);
+  };
+
   if (loading && !data) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
+          <span className="w-6 h-6 border-2 border-tertiary/30 border-t-tertiary rounded-full animate-spin" />
           <span className="text-[10px] font-bold tracking-[0.3rem] uppercase text-on-surface-variant">
             Loading EOC Data…
           </span>
@@ -110,11 +336,30 @@ export default function Dashboard() {
     );
   }
 
+  if (fetchError && !data) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <span className="material-symbols-outlined text-4xl text-error">cloud_off</span>
+          <span className="text-[10px] font-bold tracking-[0.3rem] uppercase text-on-surface-variant">
+            Unable to reach EOC systems
+          </span>
+          <button
+            onClick={() => { setLoading(true); setFetchError(false); fetch("/api/dashboard").then(r => r.json()).then(setData).catch(() => setFetchError(true)).finally(() => setLoading(false)); }}
+            className="px-5 py-2 bg-secondary-container text-on-secondary-container font-semibold text-sm rounded-lg hover:bg-surface-bright transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const metrics = data ? [
-    { label: "Active Incidents", value: String(data.stats.activeIncidents).padStart(2, '0'), sub: data.stats.incidentDelta, subColor: "text-error", accent: true },
-    { label: "Resource Requests", value: String(data.stats.resourceRequests).padStart(2, '0'), sub: data.stats.resourceStatus, subColor: "text-tertiary", accent: false },
-    { label: "Deployment ETA", value: `${data.stats.deploymentEtaMinutes}m`, sub: "avg", subColor: "text-on-surface-variant", accent: false },
-    { label: "Signal Health", value: `${data.stats.signalHealthPct}%`, sub: "", subColor: "text-tertiary", accent: false },
+    { label: "Active Incidents", value: formatMetricValue(data.stats.activeIncidents, true), sub: data.stats.incidentDelta, subColor: "text-error", accent: true },
+    { label: "Resource Requests", value: formatMetricValue(data.stats.resourceRequests, true), sub: data.stats.resourceStatus, subColor: "text-tertiary", accent: false },
+    { label: "Deployment ETA", value: data.stats.deploymentEtaMinutes > 0 ? `${data.stats.deploymentEtaMinutes}m` : "\u2014", sub: data.stats.deploymentEtaMinutes > 0 ? "avg" : "", subColor: "text-on-surface-variant", accent: false },
+    { label: "Signal Health", value: data.stats.signalHealthPct > 0 ? `${data.stats.signalHealthPct}%` : "\u2014", sub: "", subColor: "text-tertiary", accent: false },
   ] : [];
 
   const signalCards = data?.signals ?? [];
@@ -180,6 +425,15 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Report Signal button */}
+            <button
+              onClick={() => setSignalModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-tertiary-gradient text-white font-semibold text-xs tracking-wider uppercase hover:opacity-90 transition-opacity active:scale-95"
+            >
+              <span className="material-symbols-outlined text-[16px]">cell_tower</span>
+              <span className="hidden sm:inline">Report Signal</span>
+            </button>
+
             {/* Live indicator */}
             <div className="flex items-center gap-2">
               <span className="relative flex h-2 w-2">
@@ -275,7 +529,7 @@ export default function Dashboard() {
                       <div key={bar.label} className="space-y-1.5">
                         <div className="flex justify-between text-xs">
                           <span className="text-on-surface-variant">{bar.label}</span>
-                          <span className="text-on-surface">{bar.pct}%</span>
+                          <span className="text-on-surface">{bar.pct > 0 ? `${bar.pct}%` : "\u2014"}</span>
                         </div>
                         <div className="w-full bg-surface-container-high h-1 rounded-full overflow-hidden">
                           <div
@@ -321,10 +575,32 @@ export default function Dashboard() {
                 {/* Signal cards grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   {signalCards.length === 0 ? (
-                    <div className="col-span-full h-36 flex flex-col items-center justify-center opacity-30">
-                      <p className="text-[10px] font-bold tracking-[0.3rem] uppercase text-outline-variant">
-                        No signals
+                    <div className="col-span-full py-16 flex flex-col items-center justify-center text-center">
+                      <div className="w-16 h-16 rounded-full bg-surface-container-high flex items-center justify-center mb-4">
+                        <span className="material-symbols-outlined text-3xl text-outline-variant">sensors_off</span>
+                      </div>
+                      <p className="text-sm font-semibold text-on-surface-variant mb-1">
+                        No signals yet
                       </p>
+                      <p className="text-xs text-on-surface-variant/70 max-w-[280px] mb-5">
+                        Report a field signal or use the AI chat to ingest and analyze incoming intelligence.
+                      </p>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => setSignalModalOpen(true)}
+                          className="px-4 py-2 rounded-lg bg-tertiary-gradient text-white font-semibold text-xs tracking-wider uppercase hover:opacity-90 transition-opacity active:scale-95 flex items-center gap-2"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">cell_tower</span>
+                          Report Signal
+                        </button>
+                        <button
+                          onClick={() => prefillChat("I have a field report to submit: ")}
+                          className="px-4 py-2 rounded-lg bg-secondary-container text-on-secondary-container font-semibold text-xs hover:bg-surface-bright transition-colors flex items-center gap-2"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">neurology</span>
+                          Use AI Chat
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     signalCards.map((card, i) => (
@@ -399,51 +675,73 @@ export default function Dashboard() {
                         AI Strategy Recommendation
                       </p>
                       <p className="text-tertiary text-sm font-medium">
-                        Confidence Score: {aiRec && aiRec.confidenceScore > 0 ? `${aiRec.confidenceScore}%` : '—'}
+                        Confidence Score: {aiRec && aiRec.confidenceScore > 0 ? `${aiRec.confidenceScore}%` : "\u2014"}
                       </p>
                     </div>
                   </div>
 
-                  {/* Action sequence */}
-                  <div className="space-y-5 mb-8">
-                    <div className="p-5 bg-surface-container-lowest rounded-xl border-l-2 border-tertiary">
-                      <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-2">
-                        Action Sequence
-                      </p>
-                      <p className="text-on-surface text-base font-medium leading-snug">
-                        {aiRec?.actionSequence || '—'}
-                      </p>
-                    </div>
-
-                    {/* Stats */}
-                    {(aiRec?.stats ?? []).length > 0 && (
-                      <div className="space-y-3">
-                        {(aiRec?.stats ?? []).map((stat) => (
-                          <div
-                            key={stat.label}
-                            className="flex justify-between items-center text-sm border-b border-outline-variant/10 pb-2 last:border-0"
-                          >
-                            <span className="text-on-surface-variant">{stat.label}</span>
-                            <span className="text-on-surface font-mono">{stat.value}</span>
-                          </div>
-                        ))}
+                  {/* Content — show waiting state when no confidence */}
+                  {(!aiRec || aiRec.confidenceScore === 0) ? (
+                    <div className="py-8 flex flex-col items-center text-center">
+                      <div className="w-14 h-14 rounded-full bg-surface-container-lowest flex items-center justify-center mb-4">
+                        <span className="material-symbols-outlined text-2xl text-outline-variant">psychology</span>
                       </div>
-                    )}
-                  </div>
+                      <p className="text-sm font-semibold text-on-surface-variant mb-1">Waiting for AI analysis</p>
+                      <p className="text-xs text-on-surface-variant/70 max-w-[240px] mb-5">
+                        Report signals or run triage to get strategic recommendations from the AI.
+                      </p>
+                      <button
+                        onClick={() => prefillChat("Run triage analysis on the current situation")}
+                        className="px-4 py-2 rounded-lg bg-secondary-container text-on-secondary-container font-semibold text-xs hover:bg-surface-bright transition-colors flex items-center gap-2"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">neurology</span>
+                        Run Triage
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Action sequence */}
+                      <div className="space-y-5 mb-8">
+                        <div className="p-5 bg-surface-container-lowest rounded-xl border-l-2 border-tertiary">
+                          <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-2">
+                            Action Sequence
+                          </p>
+                          <p className="text-on-surface text-base font-medium leading-snug">
+                            {aiRec.actionSequence || "\u2014"}
+                          </p>
+                        </div>
 
-                  {/* CTA buttons */}
-                  <button
-                    className="w-full py-3.5 rounded-xl bg-tertiary-gradient text-white font-bold text-sm tracking-widest uppercase shadow-lg shadow-tertiary/20 hover:opacity-90 transition-all flex items-center justify-center gap-3 active:scale-95 duration-100"
-                    aria-label="Approve resource dispatch"
-                  >
-                    {aiRec?.ctaLabel ?? 'Approve Dispatch'}
-                  </button>
-                  <button
-                    className="w-full mt-3 py-2.5 rounded-xl bg-surface-container-highest text-on-surface-variant font-semibold text-xs tracking-widest uppercase hover:text-on-surface transition-colors"
-                    aria-label="Dismiss recommendation and override manually"
-                  >
-                    Dismiss &amp; Manual Override
-                  </button>
+                        {/* Stats */}
+                        {(aiRec.stats ?? []).length > 0 && (
+                          <div className="space-y-3">
+                            {(aiRec.stats ?? []).map((stat) => (
+                              <div
+                                key={stat.label}
+                                className="flex justify-between items-center text-sm border-b border-outline-variant/10 pb-2 last:border-0"
+                              >
+                                <span className="text-on-surface-variant">{stat.label}</span>
+                                <span className="text-on-surface font-mono">{stat.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* CTA buttons */}
+                      <button
+                        className="w-full py-3.5 rounded-xl bg-tertiary-gradient text-white font-bold text-sm tracking-widest uppercase shadow-lg shadow-tertiary/20 hover:opacity-90 transition-all flex items-center justify-center gap-3 active:scale-95 duration-100"
+                        aria-label="Approve resource dispatch"
+                      >
+                        {aiRec.ctaLabel ?? "Approve Dispatch"}
+                      </button>
+                      <button
+                        className="w-full mt-3 py-2.5 rounded-xl bg-surface-container-highest text-on-surface-variant font-semibold text-xs tracking-widest uppercase hover:text-on-surface transition-colors"
+                        aria-label="Dismiss recommendation and override manually"
+                      >
+                        Dismiss &amp; Manual Override
+                      </button>
+                    </>
+                  )}
                 </div>
 
                 {/* Field activity log */}
@@ -458,7 +756,11 @@ export default function Dashboard() {
                   </div>
                   <div className="space-y-3">
                     {auditLog.length === 0 ? (
-                      <p className="text-xs text-on-surface-variant opacity-50">No activity</p>
+                      <div className="py-6 flex flex-col items-center text-center">
+                        <span className="material-symbols-outlined text-xl text-outline-variant mb-2">history</span>
+                        <p className="text-xs text-on-surface-variant">No activity yet</p>
+                        <p className="text-[10px] text-on-surface-variant/50 mt-0.5">Actions and events will appear here in real time.</p>
+                      </div>
                     ) : (
                       auditLog.map((entry, i) => (
                         <div key={entry.id ?? i} className="flex gap-3 items-start">
@@ -480,13 +782,19 @@ export default function Dashboard() {
                     <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">
                       Response Protocol
                     </span>
-                    <span className="text-[10px] text-tertiary font-mono">
-                      {protocolSteps.filter((s) => s.done).length} / {protocolSteps.length}
-                    </span>
+                    {protocolSteps.length > 0 && (
+                      <span className="text-[10px] text-tertiary font-mono">
+                        {protocolSteps.filter((s) => s.done).length} / {protocolSteps.length}
+                      </span>
+                    )}
                   </div>
                   <div className="space-y-2">
                     {protocolSteps.length === 0 ? (
-                      <p className="text-xs text-on-surface-variant opacity-50">No active protocol</p>
+                      <div className="py-6 flex flex-col items-center text-center">
+                        <span className="material-symbols-outlined text-xl text-outline-variant mb-2">checklist</span>
+                        <p className="text-xs text-on-surface-variant">No active protocol</p>
+                        <p className="text-[10px] text-on-surface-variant/50 mt-0.5">Protocol steps will be set when an incident response plan is activated.</p>
+                      </div>
                     ) : (
                       protocolSteps.map((s, i) => (
                         <div key={s.id ?? i} className="flex items-center gap-3">
@@ -500,7 +808,7 @@ export default function Dashboard() {
                             }`}
                           >
                             {s.done ? (
-                              <span className="text-tertiary text-[10px] font-bold">✓</span>
+                              <span className="material-symbols-outlined text-tertiary text-[12px]">check</span>
                             ) : s.active ? (
                               <span className="w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse" />
                             ) : (
@@ -529,6 +837,13 @@ export default function Dashboard() {
         </main>
       </div>
 
+      {/* ── Signal Ingestion Modal ─────────────────────────────────────── */}
+      <SignalIngestModal
+        open={signalModalOpen}
+        onClose={() => setSignalModalOpen(false)}
+        onSuccess={refreshDashboard}
+      />
+
       {/* ── Floating AI Chat Panel ─────────────────────────────────────── */}
       {chatOpen && (
         <div className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-50 w-[min(400px,calc(100vw-2rem))] flex flex-col bg-surface-container-high border border-outline-variant/20 rounded-2xl shadow-[0_0_32px_0_rgba(231,229,228,0.08)] overflow-hidden"
@@ -543,7 +858,7 @@ export default function Dashboard() {
               <div>
                 <p className="text-sm font-semibold text-on-surface">Canary AI</p>
                 <p className="text-[10px] text-tertiary font-bold uppercase tracking-widest">
-                  {chatStatus === "streaming" ? "Analyzing…" : "Ready"}
+                  {chatStatus === "submitted" ? "Connecting…" : chatStatus === "streaming" ? "Analyzing…" : "Ready"}
                 </p>
               </div>
             </div>
@@ -584,12 +899,22 @@ export default function Dashboard() {
                       return <span key={`${msg.id}-${i}`}>{part.text}</span>;
                     }
                     if (part.type.startsWith("tool-")) {
-                      const toolPart = part as { type: string; toolCallId: string; state: string };
+                      const toolPart = part as { type: string; toolCallId: string; state: string; toolName?: string };
+                      const toolLabel = toolPart.toolName ?? part.type.replace("tool-", "");
+                      const isResult = toolPart.state === "result";
                       return (
-                        <span key={`${msg.id}-${i}`} className="flex items-center gap-1.5 text-[10px] text-tertiary font-mono py-1">
-                          <span className="material-symbols-outlined text-[12px]">build</span>
-                          {part.type.replace("tool-", "")}
-                          {toolPart.state === "result" && " ✓"}
+                        <span
+                          key={`${msg.id}-${i}`}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wide my-1 ${
+                            isResult
+                              ? "bg-tertiary/10 text-tertiary"
+                              : "bg-surface-container-highest text-on-surface-variant"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[12px]">
+                            {isResult ? "check_circle" : "pending"}
+                          </span>
+                          {toolLabel}
                         </span>
                       );
                     }
@@ -599,7 +924,7 @@ export default function Dashboard() {
               </div>
             ))}
 
-            {chatStatus === "streaming" && (
+            {(chatStatus === "submitted" || chatStatus === "streaming") && (
               <div className="flex justify-start">
                 <div className="px-4 py-2.5 rounded-xl bg-surface-container-lowest rounded-bl-sm">
                   <span className="flex gap-1">
@@ -614,11 +939,39 @@ export default function Dashboard() {
             <div ref={chatEndRef} />
           </div>
 
+          {/* Quick-action buttons */}
+          <div className="flex gap-2 px-4 py-2 border-t border-outline-variant/10 shrink-0 overflow-x-auto scrollbar-thin">
+            <button
+              onClick={() => setChatInput("I have a field signal to report: ")}
+              disabled={chatStatus !== "ready"}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-lowest text-[10px] font-semibold text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors disabled:opacity-30"
+            >
+              <span className="material-symbols-outlined text-[12px]">cell_tower</span>
+              Report field signal
+            </button>
+            <button
+              onClick={() => { setChatInput("Run triage analysis on the current situation"); }}
+              disabled={chatStatus !== "ready"}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-lowest text-[10px] font-semibold text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors disabled:opacity-30"
+            >
+              <span className="material-symbols-outlined text-[12px]">troubleshoot</span>
+              Run triage
+            </button>
+            <button
+              onClick={() => { setChatInput("Check shelter capacity near the affected area"); }}
+              disabled={chatStatus !== "ready"}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-lowest text-[10px] font-semibold text-on-surface-variant hover:bg-surface-bright hover:text-on-surface transition-colors disabled:opacity-30"
+            >
+              <span className="material-symbols-outlined text-[12px]">night_shelter</span>
+              Check shelters
+            </button>
+          </div>
+
           {/* Chat input */}
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (!chatInput.trim() || chatStatus === "streaming") return;
+              if (!chatInput.trim() || chatStatus !== "ready") return;
               sendMessage({ text: chatInput });
               setChatInput("");
             }}
@@ -629,11 +982,11 @@ export default function Dashboard() {
               onChange={(e) => setChatInput(e.currentTarget.value)}
               placeholder="Report signal or ask AI…"
               className="flex-1 bg-surface-container-lowest border border-outline-variant/15 focus:border-tertiary rounded-lg px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/50 outline-none transition-colors"
-              disabled={chatStatus === "streaming"}
+              disabled={chatStatus !== "ready"}
             />
             <button
               type="submit"
-              disabled={!chatInput.trim() || chatStatus === "streaming"}
+              disabled={!chatInput.trim() || chatStatus !== "ready"}
               className="w-9 h-9 rounded-lg bg-tertiary-gradient flex items-center justify-center text-white disabled:opacity-30 transition-opacity active:scale-95 shrink-0"
               aria-label="Send message"
             >
