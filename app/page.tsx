@@ -1066,12 +1066,9 @@ export default function Dashboard() {
                             </div>
 
                             {/* Footer */}
-                            <div className="flex items-center justify-between pt-3 border-t border-outline-variant/10">
+                            <div className="pt-3 border-t border-outline-variant/10">
                               <span className="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant">
                                 {card.source}
-                              </span>
-                              <span className="text-[10px] font-mono text-on-surface-variant">
-                                {card.time}
                               </span>
                             </div>
                           </div>
