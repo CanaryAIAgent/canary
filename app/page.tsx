@@ -360,11 +360,47 @@ export default function Dashboard() {
   const [chatFiles, setChatFiles] = useState<File[]>([]);
   const chatFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Array<{
+    id: string; title: string; description: string | null; type: string;
+    severity: number; status: string; location: string | null;
+    sources: string[]; createdAt: string;
+  }>>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchTypeFilter, setSearchTypeFilter] = useState("");
+  const [searchStatusFilter, setSearchStatusFilter] = useState("");
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const refreshDashboard = useCallback(() => {
     fetch("/api/dashboard")
       .then((r) => r.json())
       .then(setData)
       .catch(() => {});
+  }, []);
+
+  // Debounced incident search
+  const runSearch = useCallback((query: string, type: string, status: string) => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    if (!query.trim() && !type && !status) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+    setSearchLoading(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams();
+        if (query.trim()) params.set("q", query.trim());
+        if (type) params.set("type", type);
+        if (status) params.set("status", status);
+        const res = await fetch(`/api/incidents/search?${params}`);
+        const json = await res.json();
+        if (json.success) setSearchResults(json.data);
+      } catch { /* ignore */ }
+      finally { setSearchLoading(false); }
+    }, 300);
   }, []);
 
   const { messages: chatMessages, sendMessage, status: chatStatus } = useChat({
@@ -640,6 +676,135 @@ export default function Dashboard() {
 
         {/* ── Page content ─────────────────────────────────────────── */}
         <main className="pt-20 pb-24 px-4 sm:px-6 max-w-7xl mx-auto w-full space-y-10">
+
+          {/* ── Search bar ──────────────────────────────────────────── */}
+          <div className="relative">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-[20px] text-on-surface-variant pointer-events-none">search</span>
+                <input
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setSearchOpen(true);
+                    runSearch(e.target.value, searchTypeFilter, searchStatusFilter);
+                  }}
+                  onFocus={() => { if (searchQuery.trim() || searchTypeFilter || searchStatusFilter) setSearchOpen(true); }}
+                  placeholder="Search incidents by title, description, location…"
+                  className="w-full bg-surface-container-low border border-outline-variant/15 focus:border-tertiary rounded-xl pl-12 pr-4 py-3.5 text-sm text-on-surface placeholder:text-on-surface-variant/50 outline-none transition-colors"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => { setSearchQuery(""); setSearchResults([]); setSearchOpen(false); }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">close</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Search results dropdown */}
+            {searchOpen && (searchQuery.trim() || searchTypeFilter || searchStatusFilter) && (
+              <div className="absolute top-full left-0 right-0 mt-2 z-30 bg-surface-container-high border border-outline-variant/20 rounded-2xl shadow-[0_0_32px_0_rgba(231,229,228,0.12)] overflow-hidden max-h-[70vh] flex flex-col">
+                {/* Filters */}
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-outline-variant/15 overflow-x-auto scrollbar-thin shrink-0">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant shrink-0">Filters:</span>
+                  <select
+                    value={searchTypeFilter}
+                    onChange={(e) => { setSearchTypeFilter(e.target.value); runSearch(searchQuery, e.target.value, searchStatusFilter); }}
+                    className="bg-surface-container-lowest border border-outline-variant/15 rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant outline-none appearance-none cursor-pointer"
+                  >
+                    <option value="">All Types</option>
+                    {INCIDENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <select
+                    value={searchStatusFilter}
+                    onChange={(e) => { setSearchStatusFilter(e.target.value); runSearch(searchQuery, searchTypeFilter, e.target.value); }}
+                    className="bg-surface-container-lowest border border-outline-variant/15 rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant outline-none appearance-none cursor-pointer"
+                  >
+                    <option value="">All Statuses</option>
+                    {["new", "triaging", "responding", "resolved", "closed", "escalated"].map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  {(searchTypeFilter || searchStatusFilter) && (
+                    <button
+                      onClick={() => { setSearchTypeFilter(""); setSearchStatusFilter(""); runSearch(searchQuery, "", ""); }}
+                      className="text-[10px] text-tertiary font-semibold hover:underline shrink-0"
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                  <span className="ml-auto text-[10px] text-on-surface-variant font-mono shrink-0">
+                    {searchLoading ? "Searching…" : `${searchResults.length} result${searchResults.length !== 1 ? "s" : ""}`}
+                  </span>
+                </div>
+
+                {/* Results list */}
+                <div className="overflow-y-auto scrollbar-thin">
+                  {searchLoading && searchResults.length === 0 ? (
+                    <div className="py-12 flex flex-col items-center">
+                      <span className="w-5 h-5 border-2 border-tertiary/30 border-t-tertiary rounded-full animate-spin" />
+                    </div>
+                  ) : searchResults.length === 0 ? (
+                    <div className="py-12 flex flex-col items-center text-center">
+                      <span className="material-symbols-outlined text-2xl text-outline-variant mb-2">search_off</span>
+                      <p className="text-sm text-on-surface-variant">No incidents found</p>
+                      <p className="text-[10px] text-on-surface-variant/50 mt-1">Try a different search term or adjust filters</p>
+                    </div>
+                  ) : (
+                    searchResults.map((inc) => (
+                      <button
+                        key={inc.id}
+                        onClick={() => { setSearchOpen(false); router.push(`/incidents/${inc.id}`); }}
+                        className="w-full flex items-start gap-4 px-5 py-4 hover:bg-surface-container-highest transition-colors text-left border-b border-outline-variant/10 last:border-0"
+                      >
+                        {/* Severity indicator */}
+                        <div className={`w-2 h-2 rounded-full shrink-0 mt-2 ${
+                          inc.severity >= 4 ? "bg-error" : inc.severity >= 3 ? "bg-tertiary" : "bg-on-surface-variant"
+                        }`} />
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="text-sm font-semibold text-on-surface truncate">{inc.title}</h4>
+                            <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold tracking-widest uppercase ${
+                              inc.severity >= 4 ? "bg-error/15 text-error"
+                                : inc.severity >= 3 ? "bg-tertiary/15 text-tertiary"
+                                : "bg-surface-container-highest text-on-surface-variant"
+                            }`}>
+                              SEV {inc.severity}
+                            </span>
+                          </div>
+                          {inc.description && (
+                            <p className="text-xs text-on-surface-variant line-clamp-1 mb-1.5">{inc.description}</p>
+                          )}
+                          <div className="flex items-center gap-3 text-[10px] text-on-surface-variant">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container-lowest font-bold uppercase tracking-wider">{inc.type}</span>
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container-lowest font-bold uppercase tracking-wider">{inc.status}</span>
+                            {inc.location && (
+                              <span className="inline-flex items-center gap-0.5 truncate">
+                                <span className="material-symbols-outlined text-[12px]">location_on</span>
+                                {inc.location}
+                              </span>
+                            )}
+                            <span className="ml-auto font-mono shrink-0">
+                              {new Date(inc.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+
+                        <span className="material-symbols-outlined text-[18px] text-on-surface-variant shrink-0 mt-1">chevron_right</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Click-away backdrop */}
+            {searchOpen && (
+              <div className="fixed inset-0 z-20" onClick={() => setSearchOpen(false)} />
+            )}
+          </div>
 
           {/* ── Page-level tabs ────────────────────────────────────── */}
           <div className="bg-surface-container-low rounded-xl flex gap-0 overflow-hidden">
