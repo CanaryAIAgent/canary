@@ -2,7 +2,7 @@
  * Canary — In-memory data store (MVP)
  *
  * Singleton arrays that serve as the in-memory database for the MVP.
- * Seeded with realistic EOC data matching the Hurricane Helene scenario.
+ * Includes mutation functions for AI agents to push live data.
  *
  * In production, replace these exports with database queries.
  */
@@ -64,7 +64,7 @@ export interface DashboardData {
 }
 
 // ---------------------------------------------------------------------------
-// Seed data — Hurricane Helene scenario
+// Live data — mutable state (populated by AI agents at runtime)
 // ---------------------------------------------------------------------------
 
 export const stats: DashboardStats = {
@@ -88,6 +88,62 @@ export const aiRecommendation: AIRecommendation = {
   stats: [],
   ctaLabel: 'Approve Dispatch',
 };
+
+// ---------------------------------------------------------------------------
+// Mutation functions — called by AI agent routes
+// ---------------------------------------------------------------------------
+
+let signalCounter = 0;
+let activityCounter = 0;
+let stepCounter = 0;
+
+export function updateStats(partial: Partial<DashboardStats>) {
+  Object.assign(stats, partial);
+}
+
+export function addSignal(card: Omit<SignalCard, 'id'>): SignalCard {
+  const id = `sig-${String(++signalCounter).padStart(3, '0')}`;
+  const entry = { id, ...card };
+  // Prepend (newest first), cap at 20
+  signals.unshift(entry);
+  if (signals.length > 20) signals.pop();
+  return entry;
+}
+
+export function addActivity(actor: string, action: string): ActivityEntry {
+  const id = `act-${String(++activityCounter).padStart(3, '0')}`;
+  const entry: ActivityEntry = { id, actor, action, time: '0m' };
+  activity.unshift(entry);
+  if (activity.length > 50) activity.pop();
+  return entry;
+}
+
+export function setProtocolSteps(steps: Omit<ProtocolStep, 'id'>[]) {
+  protocolSteps.length = 0;
+  stepCounter = 0;
+  for (const s of steps) {
+    protocolSteps.push({
+      id: `step-${String(++stepCounter).padStart(3, '0')}`,
+      ...s,
+    });
+  }
+}
+
+export function advanceProtocol(stepId: string) {
+  for (const s of protocolSteps) {
+    if (s.id === stepId) {
+      s.done = true;
+      s.active = false;
+    }
+  }
+  // Activate next pending step
+  const next = protocolSteps.find((s) => !s.done);
+  if (next) next.active = true;
+}
+
+export function updateRecommendation(rec: Partial<AIRecommendation>) {
+  Object.assign(aiRecommendation, rec);
+}
 
 // ---------------------------------------------------------------------------
 // Aggregate getter

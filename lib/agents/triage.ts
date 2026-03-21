@@ -252,7 +252,7 @@ export const TriageResultSchema = z.object({
   rootCause: z.string(),
   rootCauseConfidence: z.number().min(0).max(1),
   blastRadius: z.string(),
-  blastRadiusDetails: z.record(z.unknown()).optional(),
+  blastRadiusDetails: z.record(z.string(), z.unknown()).optional(),
   rtoEstimateMinutes: z.number().int().nonnegative(),
   rpoEstimateMinutes: z.number().int().nonnegative(),
   validatedSeverity: SeverityLevelSchema,
@@ -288,8 +288,8 @@ export async function runTriageAgent(input: TriageAgentInput): Promise<TriageRes
   // Choose model based on priority — critical gets the more powerful reasoner
   const model =
     input.priority === 'critical'
-      ? google('gemini-2.5-pro')
-      : google('gemini-2.0-flash');
+      ? getProModel()
+      : getFlashModel();
 
   const prompt = [
     `Incident ID: ${input.incidentId}`,
@@ -336,7 +336,7 @@ export async function runTriageAgent(input: TriageAgentInput): Promise<TriageRes
   // This ensures we always return a valid, typed TriageResult regardless of how the agent
   // structured its narrative output.
   const { object: structuredResult } = await generateObject({
-    model: google('gemini-2.0-flash'),
+    model: getFlashModel(),
     schema: TriageResultSchema,
     prompt: [
       'Extract a structured TriageResult from this triage analysis:',

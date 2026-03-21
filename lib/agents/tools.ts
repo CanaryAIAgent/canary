@@ -408,7 +408,7 @@ export const deliverToSinkTool = tool({
     'Includes retry logic and signature verification.',
   inputSchema: z.object({
     sinkId: z.string().uuid(),
-    payload: z.record(z.unknown()).describe('The payload to deliver'),
+    payload: z.record(z.string(), z.unknown()).describe('The payload to deliver'),
     retryCount: z.number().int().nonnegative().max(3).default(0),
   }),
   execute: async ({ sinkId, payload, retryCount }) => {

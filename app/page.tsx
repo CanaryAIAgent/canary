@@ -4,7 +4,8 @@
 // Design: Monolith / Precision Studio (stitch/monolith_studio/DESIGN.md)
 // Layout: App Shell with sidebar + main content + sticky AI panel
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useChat } from "@ai-sdk/react";
 
 // ── Data shape from /api/dashboard ──────────────────────────────────────────
 
@@ -65,6 +66,20 @@ interface DashboardData {
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const { messages: chatMessages, sendMessage, status: chatStatus } = useChat({
+    onFinish: () => {
+      // Refresh dashboard data after AI responds (it may have pushed updates)
+      fetch("/api/dashboard").then((r) => r.json()).then(setData).catch(() => {});
+    },
+  });
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -513,6 +528,161 @@ export default function Dashboard() {
           </div>
         </main>
       </div>
+
+      {/* ── Floating AI Chat Panel ─────────────────────────────────────── */}
+      {chatOpen && (
+        <div className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-50 w-[min(400px,calc(100vw-2rem))] flex flex-col bg-surface-container-high border border-outline-variant/20 rounded-2xl shadow-[0_0_32px_0_rgba(231,229,228,0.08)] overflow-hidden"
+          style={{ height: "min(560px, calc(100dvh - 6rem))" }}
+        >
+          {/* Chat header */}
+          <div className="flex items-center justify-between px-5 py-3 border-b border-outline-variant/15 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-tertiary/10 flex items-center justify-center">
+                <span className="material-symbols-outlined text-tertiary text-[18px]">neurology</span>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-on-surface">Canary AI</p>
+                <p className="text-[10px] text-tertiary font-bold uppercase tracking-widest">
+                  {chatStatus === "streaming" ? "Analyzing…" : "Ready"}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setChatOpen(false)}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest transition-colors"
+              aria-label="Close chat"
+            >
+              <span className="material-symbols-outlined text-[18px]">close</span>
+            </button>
+          </div>
+
+          {/* Chat messages */}
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-thin">
+            {chatMessages.length === 0 && (
+              <div className="flex flex-col items-center justify-center h-full text-center opacity-50">
+                <span className="material-symbols-outlined text-3xl text-outline-variant mb-3">forum</span>
+                <p className="text-xs text-on-surface-variant font-semibold uppercase tracking-widest mb-1">
+                  EOC AI Assistant
+                </p>
+                <p className="text-xs text-on-surface-variant max-w-[240px]">
+                  Report signals, request triage, or ask for strategic recommendations.
+                </p>
+              </div>
+            )}
+
+            {chatMessages.map((msg) => (
+              <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div
+                  className={`max-w-[85%] px-4 py-2.5 rounded-xl text-sm leading-relaxed ${
+                    msg.role === "user"
+                      ? "bg-tertiary/15 text-on-surface rounded-br-sm"
+                      : "bg-surface-container-lowest text-on-surface rounded-bl-sm"
+                  }`}
+                >
+                  {msg.parts.map((part, i) => {
+                    if (part.type === "text") {
+                      return <span key={`${msg.id}-${i}`}>{part.text}</span>;
+                    }
+                    if (part.type.startsWith("tool-")) {
+                      const toolPart = part as { type: string; toolCallId: string; state: string };
+                      return (
+                        <span key={`${msg.id}-${i}`} className="flex items-center gap-1.5 text-[10px] text-tertiary font-mono py-1">
+                          <span className="material-symbols-outlined text-[12px]">build</span>
+                          {part.type.replace("tool-", "")}
+                          {toolPart.state === "result" && " ✓"}
+                        </span>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+              </div>
+            ))}
+
+            {chatStatus === "streaming" && (
+              <div className="flex justify-start">
+                <div className="px-4 py-2.5 rounded-xl bg-surface-container-lowest rounded-bl-sm">
+                  <span className="flex gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-tertiary animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-tertiary animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-tertiary animate-bounce" style={{ animationDelay: "300ms" }} />
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Chat input */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!chatInput.trim() || chatStatus === "streaming") return;
+              sendMessage({ text: chatInput });
+              setChatInput("");
+            }}
+            className="flex items-center gap-2 px-4 py-3 border-t border-outline-variant/15 shrink-0"
+          >
+            <input
+              value={chatInput}
+              onChange={(e) => setChatInput(e.currentTarget.value)}
+              placeholder="Report signal or ask AI…"
+              className="flex-1 bg-surface-container-lowest border border-outline-variant/15 focus:border-tertiary rounded-lg px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/50 outline-none transition-colors"
+              disabled={chatStatus === "streaming"}
+            />
+            <button
+              type="submit"
+              disabled={!chatInput.trim() || chatStatus === "streaming"}
+              className="w-9 h-9 rounded-lg bg-tertiary-gradient flex items-center justify-center text-white disabled:opacity-30 transition-opacity active:scale-95 shrink-0"
+              aria-label="Send message"
+            >
+              <span className="material-symbols-outlined text-[18px]">send</span>
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* ── Chat FAB (Floating Action Button) ──────────────────────────── */}
+      {!chatOpen && (
+        <button
+          onClick={() => setChatOpen(true)}
+          className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-50 w-14 h-14 rounded-full bg-tertiary-gradient shadow-lg shadow-tertiary/25 flex items-center justify-center text-white hover:opacity-90 transition-all active:scale-95 group"
+          aria-label="Open AI assistant"
+        >
+          <span className="material-symbols-outlined text-[24px] group-hover:scale-110 transition-transform">neurology</span>
+        </button>
+      )}
+
+      {/* ── Bottom nav bar (mobile) ───────────────────────────────────── */}
+      <nav
+        className="fixed bottom-0 left-0 w-full flex justify-around items-center h-16 bg-surface/80 backdrop-blur-xl border-t border-outline-variant/15 z-40 lg:hidden"
+        aria-label="Mobile navigation"
+      >
+        {[
+          { icon: "sensors", label: "Home", active: true },
+          { icon: "assignment", label: "Field", active: false },
+          { icon: "cell_tower", label: "Social", active: false },
+          { icon: "explore", label: "Map", active: false },
+        ].map((item) => (
+          <button
+            key={item.label}
+            className={`flex flex-col items-center justify-center transition-all active:scale-95 ${
+              item.active ? "text-tertiary scale-110" : "text-outline-variant hover:text-on-surface"
+            }`}
+            aria-label={item.label}
+            aria-current={item.active ? "page" : undefined}
+          >
+            <span
+              className="material-symbols-outlined"
+              style={item.active ? { fontVariationSettings: "'FILL' 1" } : undefined}
+            >
+              {item.icon}
+            </span>
+            <span className="text-[8px] font-semibold tracking-[0.1rem] uppercase mt-1">{item.label}</span>
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }

@@ -296,7 +296,7 @@ export const SinkDeliveryPayloadSchema = z.object({
   severity: SeverityLevelSchema,
   location: LocationSchema.optional(),
   summary: z.string(),
-  data: z.record(z.unknown()),
+  data: z.record(z.string(), z.unknown()),
   canaryVersion: z.string().default('1.0.0'),
 });
 export type SinkDeliveryPayload = z.infer<typeof SinkDeliveryPayloadSchema>;
@@ -468,7 +468,7 @@ export const IntegrationWebhookPayloadSchema = z.object({
   title: z.string(),
   description: z.string().optional(),
   resourceId: z.string().optional(),
-  rawPayload: z.record(z.unknown()),
+  rawPayload: z.record(z.string(), z.unknown()),
   receivedAt: z.string().datetime(),
 });
 export type IntegrationWebhookPayload = z.infer<typeof IntegrationWebhookPayloadSchema>;
@@ -514,7 +514,7 @@ export type NotifySubscribersRequest = z.infer<typeof NotifySubscribersRequestSc
 // Orchestrator request
 export const OrchestratorRequestSchema = z.object({
   incidentId: z.string().uuid().optional(),
-  alertPayload: z.record(z.unknown()).optional(),
+  alertPayload: z.record(z.string(), z.unknown()).optional(),
   source: IncidentSourceSchema,
   priority: z.enum(['critical', 'high', 'normal']).default('normal'),
   context: z.string().optional().describe('Additional context for the orchestrator'),
