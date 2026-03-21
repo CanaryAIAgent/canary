@@ -141,6 +141,15 @@ export default function VideoAnalysisPage() {
       }
 
       const res = await fetch("/api/video/analyze", { method: "POST", body: formData });
+
+      // Handle non-JSON responses (e.g. 413 Request Entity Too Large)
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/json")) {
+        const text = await res.text();
+        setError(`Server error (${res.status}): ${text.slice(0, 200)}`);
+        return;
+      }
+
       const json = await res.json();
 
       if (json.success) {

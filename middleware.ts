@@ -13,7 +13,9 @@ export const config = {
      * - _next/image (image optimization)
      * - favicon.ico (favicon)
      * - public assets (svg, png, jpg, etc.)
+     * - /api/video (large file uploads)
+     * - /api/photos (large file uploads)
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/video|api/photos|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

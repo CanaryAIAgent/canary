@@ -4,29 +4,61 @@
  * POST /api/video/analyze
  *
  * Accepts multipart form data with an incident video,
- * runs Gemini (multimodal video) analysis, and persists
- * results with timestamped events to the incident in Supabase.
+ * runs Gemini (multimodal video) analysis via the Google Generative AI SDK,
+ * and persists results with timestamped events to the incident in Supabase.
+ *
+ * Uses @google/generative-ai directly (not the AI SDK) because the AI SDK's
+ * generateObject does not support video file parts.
  */
 
-import { generateObject } from 'ai';
-import { getVideoModel } from '@/lib/ai/config';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleAIFileManager } from '@google/generative-ai/server';
 import {
   dbInsertIncident,
   dbGetIncident,
   dbUpdateIncident,
   dbInsertAgentLog,
 } from '@/lib/db';
-import { VideoAnalysisResponseSchema } from '@/lib/schemas';
 import { addSignal, addActivity, updateStats, stats } from '@/lib/data/store';
-import { GoogleAIFileManager } from '@google/generative-ai/server';
 
-export const maxDuration = 120; // Videos take longer to process
+export const maxDuration = 120;
+
+const RESPONSE_SCHEMA = {
+  type: 'object' as const,
+  properties: {
+    summary: { type: 'string' as const, description: 'Concise narrative of the incident' },
+    severity: { type: 'number' as const, description: 'Overall severity 1-5' },
+    confidence: { type: 'number' as const, description: 'Confidence 0-1' },
+    hazards: { type: 'array' as const, items: { type: 'string' as const } },
+    sceneSummary: { type: 'string' as const, description: 'Overall scene description' },
+    progressionAnalysis: { type: 'string' as const, description: 'How situation changes over time' },
+    timeline: {
+      type: 'array' as const,
+      items: {
+        type: 'object' as const,
+        properties: {
+          timestamp: { type: 'string' as const, description: 'HH:MM:SS format' },
+          seconds: { type: 'number' as const },
+          event: { type: 'string' as const },
+          severity: { type: 'number' as const },
+          category: { type: 'string' as const },
+        },
+        required: ['timestamp', 'seconds', 'event', 'severity', 'category'],
+      },
+    },
+    damageCategory: { type: 'string' as const },
+    structuralIntegrity: { type: 'string' as const },
+    detectedObjects: { type: 'array' as const, items: { type: 'string' as const } },
+    extractedAddress: { type: 'string' as const },
+    recommendedActions: { type: 'array' as const, items: { type: 'string' as const } },
+  },
+  required: ['summary', 'severity', 'confidence', 'hazards', 'sceneSummary', 'timeline'],
+};
 
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
 
-    // Extract fields
     const incidentId = formData.get('incidentId') as string | null;
     const title = formData.get('title') as string | null;
     const description = formData.get('description') as string | null;
@@ -35,9 +67,7 @@ export async function POST(request: Request) {
     const severity = severityRaw ? Number(severityRaw) : undefined;
     const location = formData.get('location') as string | null;
 
-    // Get the video file
     const video = formData.get('video') as File | null;
-
     if (!video) {
       return Response.json(
         { success: false, error: { code: 'VALIDATION_ERROR', message: 'A video file is required' } },
@@ -52,7 +82,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verify incident exists if ID provided
     let existingIncident = null;
     if (incidentId) {
       existingIncident = await dbGetIncident(incidentId);
@@ -64,11 +93,45 @@ export async function POST(request: Request) {
       }
     }
 
+    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    if (!apiKey) throw new Error('GOOGLE_GENERATIVE_AI_API_KEY is required');
+
     const arrayBuffer = await video.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const mimeType = video.type || 'video/mp4';
 
-    // Build AI prompt
+    // Upload video via Google File API (required for video)
+    const fileManager = new GoogleAIFileManager(apiKey);
+    const { writeFileSync, unlinkSync } = await import('fs');
+    const { join } = await import('path');
+    const { tmpdir } = await import('os');
+    const tmpPath = join(tmpdir(), `canary-video-${Date.now()}.mp4`);
+
+    let fileUri: string;
+    try {
+      writeFileSync(tmpPath, buffer);
+
+      const uploadResult = await fileManager.uploadFile(tmpPath, {
+        mimeType,
+        displayName: video.name || 'incident-video.mp4',
+      });
+
+      let file = uploadResult.file;
+      while (file.state === 'PROCESSING') {
+        await new Promise(r => setTimeout(r, 2000));
+        file = await fileManager.getFile(file.name);
+      }
+
+      if (file.state === 'FAILED') {
+        throw new Error('Video processing failed on Google servers');
+      }
+
+      fileUri = file.uri;
+    } finally {
+      try { unlinkSync(tmpPath); } catch { /* ignore */ }
+    }
+
+    // Build prompt
     const promptText = [
       'Analyze the following incident video for emergency response purposes.',
       'Watch the entire video carefully and create a detailed timeline of significant events with precise timestamps.',
@@ -90,81 +153,35 @@ export async function POST(request: Request) {
       description ? `Additional context: ${description}` : null,
     ].filter(Boolean).join('\n');
 
-    // For large videos (>4MB), use Google File API to upload first
-    // For small videos, use inline base64
-    const INLINE_LIMIT = 4 * 1024 * 1024; // 4MB
-    let videoPart: { type: 'file'; mediaType: string; data: string | URL };
-
-    if (buffer.length > INLINE_LIMIT) {
-      // Upload via Google File API
-      const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-      if (!apiKey) throw new Error('GOOGLE_GENERATIVE_AI_API_KEY is required for large video uploads');
-
-      const fileManager = new GoogleAIFileManager(apiKey);
-
-      // Write to temp file for the File API
-      const { writeFileSync, unlinkSync } = await import('fs');
-      const { join } = await import('path');
-      const { tmpdir } = await import('os');
-      const tmpPath = join(tmpdir(), `canary-video-${Date.now()}.mp4`);
-
-      try {
-        writeFileSync(tmpPath, buffer);
-
-        const uploadResult = await fileManager.uploadFile(tmpPath, {
-          mimeType,
-          displayName: video.name || 'incident-video.mp4',
-        });
-
-        // Wait for processing to complete
-        let file = uploadResult.file;
-        while (file.state === 'PROCESSING') {
-          await new Promise(r => setTimeout(r, 2000));
-          const result = await fileManager.getFile(file.name);
-          file = result;
-        }
-
-        if (file.state === 'FAILED') {
-          throw new Error('Video processing failed on Google servers');
-        }
-
-        videoPart = { type: 'file', mediaType: mimeType, data: new URL(file.uri) };
-      } finally {
-        try { unlinkSync(tmpPath); } catch { /* ignore cleanup errors */ }
-      }
-    } else {
-      // Small file — inline base64
-      videoPart = { type: 'file', mediaType: mimeType, data: buffer.toString('base64') };
-    }
-
-    // Run AI analysis with video
-    const { object: analysis } = await generateObject({
-      model: getVideoModel(),
-      schema: VideoAnalysisResponseSchema,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: promptText },
-            videoPart,
-          ],
-        },
-      ],
+    // Call Gemini directly with video file reference
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: RESPONSE_SCHEMA,
+      },
     });
+
+    const result = await model.generateContent([
+      promptText,
+      { fileData: { mimeType, fileUri } },
+    ]);
+
+    const responseText = result.response.text();
+    const analysis = JSON.parse(responseText);
 
     const finalSeverity = severity ?? analysis.severity ?? 3;
     let resultIncidentId: string;
     let isNewIncident = false;
 
     if (incidentId && existingIncident) {
-      // Update existing incident
       await dbUpdateIncident(incidentId, {
-        aiAnalysis: { ...analysis, type: 'video_analysis' } as typeof analysis,
+        aiAnalysis: analysis,
         severity: finalSeverity,
       });
       resultIncidentId = incidentId;
     } else {
-      // Create new incident
       const validTypes = ['flood', 'fire', 'structural', 'medical', 'hazmat', 'earthquake', 'infrastructure', 'cyber'] as const;
       const incidentType = validTypes.includes(type as typeof validTypes[number])
         ? (type as typeof validTypes[number])
@@ -178,7 +195,7 @@ export async function POST(request: Request) {
         status: 'new',
         location: location ? { description: location } : (analysis.extractedAddress ? { description: analysis.extractedAddress } : {}),
         sources: ['field'],
-        aiAnalysis: { ...analysis, type: 'video_analysis' } as typeof analysis,
+        aiAnalysis: analysis,
         mediaUrls: [],
         corroboratedBySignals: [],
         linkedCameraAlerts: [],
@@ -205,7 +222,6 @@ export async function POST(request: Request) {
       `Analyzed video for incident "${title || existingIncident?.title}" — severity ${finalSeverity}, ${analysis.timeline?.length ?? 0} events detected`,
     );
 
-    // Persist to agent_logs
     try {
       await dbInsertAgentLog({
         agentType: 'triage',
@@ -218,10 +234,7 @@ export async function POST(request: Request) {
         toolCallsSucceeded: ['video_analysis'],
         toolCallsFailed: [],
         actionsEscalated: [],
-        rawStepJson: JSON.stringify({
-          type: 'video_analysis',
-          analysis,
-        }),
+        rawStepJson: JSON.stringify({ type: 'video_analysis', analysis }),
         timestamp: new Date().toISOString(),
       });
     } catch (logErr) {
