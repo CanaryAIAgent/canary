@@ -148,8 +148,9 @@ export default function VideoAnalysisPage() {
       } else {
         setError(json.error?.message ?? "Analysis failed");
       }
-    } catch {
-      setError("Failed to connect to analysis service.");
+    } catch (err) {
+      console.error("[video] fetch error:", err);
+      setError(err instanceof Error ? err.message : "Failed to connect to analysis service.");
     } finally {
       setAnalyzing(false);
     }

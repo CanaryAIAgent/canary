@@ -18,6 +18,7 @@ import {
 } from '@/lib/db';
 import { VideoAnalysisResponseSchema } from '@/lib/schemas';
 import { addSignal, addActivity, updateStats, stats } from '@/lib/data/store';
+import { GoogleAIFileManager } from '@google/generative-ai/server';
 
 export const maxDuration = 120; // Videos take longer to process
 
@@ -63,9 +64,8 @@ export async function POST(request: Request) {
       }
     }
 
-    // Convert video to base64 data URL for Gemini
     const arrayBuffer = await video.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString('base64');
+    const buffer = Buffer.from(arrayBuffer);
     const mimeType = video.type || 'video/mp4';
 
     // Build AI prompt
@@ -90,6 +90,53 @@ export async function POST(request: Request) {
       description ? `Additional context: ${description}` : null,
     ].filter(Boolean).join('\n');
 
+    // For large videos (>4MB), use Google File API to upload first
+    // For small videos, use inline base64
+    const INLINE_LIMIT = 4 * 1024 * 1024; // 4MB
+    let videoPart: { type: 'file'; mediaType: string; data: string | URL };
+
+    if (buffer.length > INLINE_LIMIT) {
+      // Upload via Google File API
+      const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+      if (!apiKey) throw new Error('GOOGLE_GENERATIVE_AI_API_KEY is required for large video uploads');
+
+      const fileManager = new GoogleAIFileManager(apiKey);
+
+      // Write to temp file for the File API
+      const { writeFileSync, unlinkSync } = await import('fs');
+      const { join } = await import('path');
+      const { tmpdir } = await import('os');
+      const tmpPath = join(tmpdir(), `canary-video-${Date.now()}.mp4`);
+
+      try {
+        writeFileSync(tmpPath, buffer);
+
+        const uploadResult = await fileManager.uploadFile(tmpPath, {
+          mimeType,
+          displayName: video.name || 'incident-video.mp4',
+        });
+
+        // Wait for processing to complete
+        let file = uploadResult.file;
+        while (file.state === 'PROCESSING') {
+          await new Promise(r => setTimeout(r, 2000));
+          const result = await fileManager.getFile(file.name);
+          file = result;
+        }
+
+        if (file.state === 'FAILED') {
+          throw new Error('Video processing failed on Google servers');
+        }
+
+        videoPart = { type: 'file', mediaType: mimeType, data: new URL(file.uri) };
+      } finally {
+        try { unlinkSync(tmpPath); } catch { /* ignore cleanup errors */ }
+      }
+    } else {
+      // Small file — inline base64
+      videoPart = { type: 'file', mediaType: mimeType, data: buffer.toString('base64') };
+    }
+
     // Run AI analysis with video
     const { object: analysis } = await generateObject({
       model: getVideoModel(),
@@ -99,7 +146,7 @@ export async function POST(request: Request) {
           role: 'user',
           content: [
             { type: 'text', text: promptText },
-            { type: 'file', mediaType: mimeType, data: base64 },
+            videoPart,
           ],
         },
       ],
