@@ -11,8 +11,8 @@
  */
 
 import { generateText, stepCountIs } from 'ai';
-import { google } from '@ai-sdk/google';
 import { tool } from 'ai';
+import { getFlashModel } from '@/lib/ai/config';
 import { z } from 'zod';
 import { ORCHESTRATOR_PROMPT } from './prompts';
 import {
@@ -239,7 +239,7 @@ export async function runOrchestratorAgent(
   const prompt = contextParts.join('\n');
 
   const { text, steps, finishReason, usage } = await generateText({
-    model: google('gemini-2.0-flash'),
+    model: getFlashModel(),
     system: ORCHESTRATOR_PROMPT,
     prompt,
     tools: {

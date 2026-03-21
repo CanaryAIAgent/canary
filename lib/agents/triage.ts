@@ -13,8 +13,8 @@
  */
 
 import { generateText, generateObject, stepCountIs } from 'ai';
-import { google } from '@ai-sdk/google';
 import { tool } from 'ai';
+import { getFlashModel, getProModel } from '@/lib/ai/config';
 import { z } from 'zod';
 import { TRIAGE_PROMPT } from './prompts';
 import {

@@ -1,112 +1,66 @@
+"use client";
+
 // Canary — EOC Command Dashboard
 // Design: Monolith / Precision Studio (stitch/monolith_studio/DESIGN.md)
 // Layout: App Shell with icon-rail sidebar + main content + sticky AI panel
 
-const metrics = [
-  {
-    label: "Active Incidents",
-    value: "14",
-    sub: "+2/hr",
-    subColor: "text-error",
-    accent: true,
-  },
-  {
-    label: "Resource Requests",
-    value: "08",
-    sub: "Pending",
-    subColor: "text-tertiary",
-    accent: false,
-  },
-  {
-    label: "Deployment ETA",
-    value: "4.2m",
-    sub: "avg",
-    subColor: "text-on-surface-variant",
-    accent: false,
-  },
-  {
-    label: "Signal Health",
-    value: "98%",
-    sub: "✓ verified",
-    subColor: "text-tertiary",
-    accent: false,
-  },
-];
+import { useState, useEffect } from "react";
 
-const signalCards = [
-  {
-    tag: "CRITICAL // FIELD",
-    tagColor: "text-error",
-    title: "Structural Collapse — Oak St",
-    desc: "Three-story residential at 1204 Oak Street confirmed partial collapse. Two individuals reported trapped on second floor. Heavy rescue required immediately.",
-    source: "Field Responder",
-    credibility: 96,
-    credibilityColor: "bg-tertiary",
-    time: "1:42m ago",
-    icon: "apartment",
-  },
-  {
-    tag: "LIVE // CAMERA",
-    tagColor: "text-error",
-    title: "Flood Water Rising — SR-24",
-    desc: "CAM-047 detects water level exceeding 3ft on State Route 24 at mile marker 12. Vehicle passage no longer safe. AI confidence: 91%.",
-    source: "Camera Feed AI",
-    credibility: 91,
-    credibilityColor: "bg-tertiary",
-    time: "4:08m ago",
-    icon: "videocam",
-  },
-  {
-    tag: "SOCIAL // X",
-    tagColor: "text-on-surface-variant",
-    title: "Distress Reports Spike",
-    desc: "Volume spike in posts mentioning 'trapped' and 'help' from @handles geolocated to Sector 7. 480 unique posts in 10m. Corroborates field report INC-042.",
-    source: "Social Intelligence",
-    credibility: 61,
-    credibilityColor: "bg-error",
-    time: "7:55m ago",
-    icon: "person_search",
-  },
-  {
-    tag: "VERIFIED // SHELTER",
-    tagColor: "text-tertiary",
-    title: "Riverside HS At Capacity",
-    desc: "Primary shelter Riverside High School has reached 94% occupancy (1,410 of 1,500). Red Cross requesting activation of secondary shelter at Memorial Civic Center.",
-    source: "Verified Report",
-    credibility: 99,
-    credibilityColor: "bg-tertiary",
-    time: "11:20m ago",
-    icon: "home_work",
-  },
-  {
-    tag: "MONITOR // ROUTE 17",
-    tagColor: "text-on-surface-variant",
-    title: "Road Passability Unknown",
-    desc: "No field team has reached Route 17 bridge crossing. Last known status from 18m ago: passable. Storm surge models suggest imminent inundation risk.",
-    source: "Traffic Monitor",
-    credibility: 54,
-    credibilityColor: "bg-error",
-    time: "18:33m ago",
-    icon: "road",
-  },
-  {
-    tag: null,
-    title: null,
-    desc: null,
-    source: null,
-    credibility: 0,
-    credibilityColor: "",
-    time: null,
-    icon: "hourglass_empty",
-    empty: true,
-  },
-];
+// ── Data shape from /api/dashboard ──────────────────────────────────────────
 
-const auditLog = [
-  { actor: "Triage Agent", action: "Structural collapse at Oak St confirmed by cross-referencing 3 field reports and 2 camera feeds.", time: "1m" },
-  { actor: "Orchestrator", action: "Heavy Rescue Unit 12 recommended for dispatch based on proximity and availability.", time: "2m" },
-  { actor: "EOC Base", action: "Shelter capacity alert triggered. Memorial Civic Center pre-notification sent.", time: "4m" },
-];
+interface DashboardStats {
+  activeIncidents: number;
+  incidentDelta: string;
+  resourceRequests: number;
+  resourceStatus: string;
+  deploymentEtaMinutes: number;
+  signalHealthPct: number;
+}
+
+interface SignalCard {
+  id: string;
+  tag: string | null;
+  tagColor: string;
+  title: string | null;
+  desc: string | null;
+  source: string | null;
+  credibility: number;
+  credibilityColor: string;
+  time: string;
+  icon: string;
+  empty?: boolean;
+}
+
+interface ActivityEntry {
+  id: string;
+  actor: string;
+  action: string;
+  time: string;
+}
+
+interface ProtocolStep {
+  id: string;
+  step: string;
+  done: boolean;
+  active?: boolean;
+}
+
+interface AiRecommendation {
+  actionSequence: string;
+  confidenceScore: number;
+  stats: Array<{ label: string; value: string }>;
+  ctaLabel: string;
+}
+
+interface DashboardData {
+  stats: DashboardStats;
+  signals: SignalCard[];
+  activity: ActivityEntry[];
+  protocolSteps: ProtocolStep[];
+  aiRecommendation: AiRecommendation;
+}
+
+// ── Static UI config ─────────────────────────────────────────────────────────
 
 const navItems = [
   { icon: "sensors", label: "Dashboard", active: true },
@@ -116,7 +70,56 @@ const navItems = [
   { icon: "local_shipping", label: "Resources", active: false },
 ];
 
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function Dashboard() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch('/api/dashboard');
+        const json = await res.json();
+        setData(json);
+      } catch (e) {
+        console.error('[dashboard] fetch failed', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+    const interval = setInterval(fetchData, 15_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (loading && !data) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <span className="material-symbols-outlined text-tertiary text-4xl animate-spin" style={{ animationDuration: '2s' }}>
+            autorenew
+          </span>
+          <span className="text-[10px] font-bold tracking-[0.3rem] uppercase text-on-surface-variant">
+            Loading EOC Data…
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  const metrics = data ? [
+    { label: "Active Incidents", value: String(data.stats.activeIncidents).padStart(2, '0'), sub: data.stats.incidentDelta, subColor: "text-error", accent: true },
+    { label: "Resource Requests", value: String(data.stats.resourceRequests).padStart(2, '0'), sub: data.stats.resourceStatus, subColor: "text-tertiary", accent: false },
+    { label: "Deployment ETA", value: `${data.stats.deploymentEtaMinutes}m`, sub: "avg", subColor: "text-on-surface-variant", accent: false },
+    { label: "Signal Health", value: `${data.stats.signalHealthPct}%`, sub: "✓", subColor: "text-tertiary", accent: false },
+  ] : [];
+
+  const signalCards = data?.signals ?? [];
+  const auditLog = data?.activity ?? [];
+  const protocolSteps = data?.protocolSteps ?? [];
+  const aiRec = data?.aiRecommendation;
+
   return (
     <div className="flex min-h-dvh bg-background text-on-background">
 
@@ -339,7 +342,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   {signalCards.map((card, i) => (
                     <article
-                      key={i}
+                      key={card.id ?? i}
                       className="bg-surface-container-low border border-outline-variant/15 rounded-xl overflow-hidden group hover:border-outline-variant/30 transition-colors"
                     >
                       {card.empty ? (
@@ -415,7 +418,9 @@ export default function Dashboard() {
                       <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2rem]">
                         AI Strategy Recommendation
                       </p>
-                      <p className="text-tertiary text-sm font-medium">Confidence Score: 94.1%</p>
+                      <p className="text-tertiary text-sm font-medium">
+                        Confidence Score: {aiRec ? `${aiRec.confidenceScore}%` : '—'}
+                      </p>
                     </div>
                   </div>
 
@@ -426,18 +431,13 @@ export default function Dashboard() {
                         Action Sequence
                       </p>
                       <p className="text-on-surface text-base font-medium leading-snug">
-                        Dispatch Heavy Rescue Unit 12 to 1204 Oak Street; activate Memorial Civic Center as secondary shelter to relieve Riverside HS capacity pressure.
+                        {aiRec?.actionSequence ?? '—'}
                       </p>
                     </div>
 
                     {/* Stats */}
                     <div className="space-y-3">
-                      {[
-                        { label: "Affected Residents", value: "~847" },
-                        { label: "Est. Response Time", value: "6.4 min" },
-                        { label: "Success Probability", value: "High" },
-                        { label: "Resources Available", value: "7 of 11" },
-                      ].map((stat) => (
+                      {(aiRec?.stats ?? []).map((stat) => (
                         <div
                           key={stat.label}
                           className="flex justify-between items-center text-sm border-b border-outline-variant/10 pb-2 last:border-0"
@@ -454,7 +454,7 @@ export default function Dashboard() {
                     className="w-full py-3.5 rounded-xl bg-tertiary-gradient text-white font-bold text-sm tracking-widest uppercase shadow-lg shadow-tertiary/20 hover:opacity-90 transition-all flex items-center justify-center gap-3 group active:scale-95 duration-100"
                     aria-label="Approve resource dispatch"
                   >
-                    Approve Dispatch
+                    {aiRec?.ctaLabel ?? 'Approve Dispatch'}
                     <span className="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">
                       chevron_right
                     </span>
@@ -479,7 +479,7 @@ export default function Dashboard() {
                   </div>
                   <div className="space-y-3">
                     {auditLog.map((entry, i) => (
-                      <div key={i} className="flex gap-3 items-start">
+                      <div key={entry.id ?? i} className="flex gap-3 items-start">
                         <div className="w-1.5 h-1.5 rounded-full bg-secondary shrink-0 mt-1.5" />
                         <p className="text-xs text-on-surface/80">
                           <span className="font-bold text-on-surface">{entry.actor}:</span>{" "}
@@ -497,19 +497,13 @@ export default function Dashboard() {
                     <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">
                       Response Protocol: INC-042 v2.1
                     </span>
-                    <span className="text-[10px] text-tertiary font-mono">4 / 7</span>
+                    <span className="text-[10px] text-tertiary font-mono">
+                      {protocolSteps.filter((s) => s.done).length} / {protocolSteps.length}
+                    </span>
                   </div>
                   <div className="space-y-2">
-                    {[
-                      { step: "Assess structural stability — Oak St", done: true },
-                      { step: "Deploy heavy rescue to Oak St", done: true },
-                      { step: "Establish perimeter — 100m radius", done: true },
-                      { step: "Coordinate medical triage on-site", done: false, active: true },
-                      { step: "Activate secondary shelter — Memorial CC", done: false },
-                      { step: "Clear Route 17 bridge for emergency access", done: false },
-                      { step: "File ICS-214 incident report", done: false },
-                    ].map((s, i) => (
-                      <div key={i} className="flex items-center gap-3">
+                    {protocolSteps.map((s, i) => (
+                      <div key={s.id ?? i} className="flex items-center gap-3">
                         <div
                           className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
                             s.done
