@@ -73,6 +73,18 @@ interface DashboardData {
   aiRecommendation: AiRecommendation;
 }
 
+interface XBotMention {
+  id: string;
+  tweet_id: string;
+  author_handle: string;
+  tweet_text: string;
+  confidence: string;
+  ai_response: string | null;
+  processed_at: string;
+  media_urls: string[];
+  has_media: boolean;
+}
+
 // ── Signal Ingestion Modal ──────────────────────────────────────────────────
 
 // ── Photo Analysis types ──────────────────────────────────────────────────
@@ -369,11 +381,24 @@ export default function Dashboard() {
   const [searchStatusFilter, setSearchStatusFilter] = useState("");
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // X Bot Mentions state
+  const [mentions, setMentions] = useState<XBotMention[]>([]);
+
   const refreshDashboard = useCallback(() => {
     fetch("/api/dashboard")
       .then((r) => r.json())
       .then(setData)
       .catch(() => {});
+  }, []);
+
+  const fetchMentions = useCallback(async () => {
+    try {
+      const res = await fetch("/api/xbot/log?limit=10");
+      const data = await res.json();
+      setMentions(data.mentions || []);
+    } catch (error) {
+      console.error("Failed to fetch mentions:", error);
+    }
   }, []);
 
   // Debounced incident search
@@ -428,9 +453,13 @@ export default function Dashboard() {
       }
     };
     fetchData();
-    const interval = setInterval(fetchData, 15_000);
+    fetchMentions();
+    const interval = setInterval(() => {
+      fetchData();
+      fetchMentions();
+    }, 15_000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchMentions]);
 
   // Fetch incidents for photo analysis tab
   useEffect(() => {
@@ -989,6 +1018,89 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              {/* X Bot Mentions Carousel */}
+              {mentions.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-base font-semibold text-on-surface">Recent X Mentions</h3>
+                      <p className="text-on-surface-variant text-xs mt-0.5">Latest @canaryaiagent mentions from X (Twitter)</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-tertiary text-[16px]">share</span>
+                      <span className="text-xs font-semibold text-on-surface-variant">
+                        {mentions.length} {mentions.length === 1 ? 'mention' : 'mentions'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Horizontal scrolling carousel */}
+                  <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin snap-x snap-mandatory">
+                    {mentions.map((mention) => (
+                      <div
+                        key={mention.id}
+                        className="flex-shrink-0 w-[340px] bg-surface-container-low rounded-xl border border-outline-variant/15 hover:border-outline-variant/30 transition-all overflow-hidden snap-start group"
+                      >
+                        {/* Media preview if available */}
+                        {mention.has_media && mention.media_urls && mention.media_urls.length > 0 && (
+                          <div className="relative w-full h-48 bg-surface-container-highest overflow-hidden">
+                            <img
+                              src={mention.media_urls[0]}
+                              alt="Tweet media"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                            {mention.media_urls.length > 1 && (
+                              <div className="absolute top-2 right-2 bg-black/70 text-white text-[10px] font-bold px-2 py-1 rounded-full">
+                                +{mention.media_urls.length - 1}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Content */}
+                        <div className="p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="material-symbols-outlined text-tertiary text-[14px]">share</span>
+                              <span className="text-xs font-bold text-on-surface">
+                                @{mention.author_handle}
+                              </span>
+                            </div>
+                            <span
+                              className={`text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full ${
+                                mention.confidence === "confirmed"
+                                  ? "bg-tertiary/10 text-tertiary"
+                                  : "bg-surface-container-high text-on-surface-variant"
+                              }`}
+                            >
+                              {mention.confidence}
+                            </span>
+                          </div>
+
+                          <p className="text-xs text-on-surface leading-relaxed mb-2 line-clamp-3">
+                            {mention.tweet_text}
+                          </p>
+
+                          <div className="flex items-center justify-between pt-2 border-t border-outline-variant/10">
+                            <span className="text-[9px] text-on-surface-variant font-mono">
+                              {new Date(mention.processed_at).toLocaleTimeString()}
+                            </span>
+                            {mention.ai_response && (
+                              <span className="text-[9px] font-bold uppercase tracking-widest text-tertiary">
+                                AI Analyzed
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Signal feed */}
               <div>
                 <div className="flex items-center justify-between mb-4">
@@ -1090,6 +1202,7 @@ export default function Dashboard() {
                   )}
                 </div>
               </div>
+
             </div>
 
             {/* RIGHT — Sticky AI recommendation panel ─────────────── */}
