@@ -2,11 +2,11 @@
  * POST /api/incidents/[id]/resources
  *
  * Creates a resource request for the given incident.
- * Increments the dashboard resource request counter and logs activity.
+ * Persists to the resource_requests table, updates dashboard stats, and logs activity.
  */
 
-import { addResourceRequest } from '@/lib/data/store';
-import { dbInsertAgentLog } from '@/lib/db';
+import { addActivity, updateStats, stats } from '@/lib/data/store';
+import { dbInsertResourceRequest } from '@/lib/db';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -17,32 +17,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return Response.json({ success: false, error: 'resourceType is required' }, { status: 400 });
     }
 
-    const description = `${quantity ?? 1}x ${resourceType}${priority ? ` (${priority})` : ''}${notes ? ` — ${notes}` : ''}`;
+    // Persist to resource_requests table
+    const request = await dbInsertResourceRequest({
+      incidentId,
+      resourceType,
+      quantity: quantity ?? 1,
+      priority: priority ?? 'standard',
+      description: notes ?? undefined,
+      requestedBy: 'Incident Commander',
+    });
 
     // Update in-memory dashboard
-    addResourceRequest(description);
-
-    // Persist to agent_logs
-    try {
-      await dbInsertAgentLog({
-        agentType: 'orchestrator',
-        incidentId,
-        sessionId: crypto.randomUUID(),
-        stepIndex: 0,
-        decisionRationale: `RESOURCE REQUEST: ${description}`,
-        toolCallsAttempted: [],
-        toolCallsSucceeded: [],
-        toolCallsFailed: [],
-        actionsEscalated: [],
-        timestamp: new Date().toISOString(),
-      });
-    } catch (err) {
-      console.error('[resources] DB persist failed:', err);
-    }
+    updateStats({ resourceRequests: stats.resourceRequests + 1, resourceStatus: 'Pending' });
+    const description = `${quantity ?? 1}x ${resourceType}${priority ? ` (${priority})` : ''}${notes ? ` — ${notes}` : ''}`;
+    addActivity('Incident Commander', `Resource request: ${description}`);
 
     return Response.json({
       success: true,
-      data: { incidentId, resourceType, quantity: quantity ?? 1, priority, notes },
+      data: request,
     });
   } catch (error) {
     console.error('[resources] error:', error);

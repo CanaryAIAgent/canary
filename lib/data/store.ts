@@ -191,11 +191,14 @@ export async function syncDashboardFromDb(): Promise<DashboardData> {
   try {
     const activeStatuses = ['new', 'triaging', 'responding', 'escalated'];
 
-    const [activeIncidents, recentSignals, recentAlerts, recentLogs] = await Promise.all([
+    const { dbListResourceRequests } = await import('@/lib/db');
+
+    const [activeIncidents, recentSignals, recentAlerts, recentLogs, pendingResources] = await Promise.all([
       dbListIncidents({ status: activeStatuses, limit: 100 }),
       dbListSocialSignals({ limit: 10 }),
       dbListCameraAlerts({ limit: 10 }),
       dbListAgentLogs({ limit: 20 }),
+      dbListResourceRequests({ status: ['pending', 'approved', 'dispatched'], limit: 100 }),
     ]);
 
     const hasDbData =
@@ -210,12 +213,15 @@ export async function syncDashboardFromDb(): Promise<DashboardData> {
       return getDashboardData();
     }
 
-    // Stats from DB — incidents are the source of truth
+    // Stats from DB — incidents + resources are the source of truth
+    const pendingCount = pendingResources.filter(r => r.status === 'pending').length;
     updateStats({
       activeIncidents: activeIncidents.length,
       incidentDelta: activeIncidents.length > 0
         ? `+${activeIncidents.length} active`
         : '',
+      resourceRequests: pendingResources.length,
+      resourceStatus: pendingCount > 0 ? `${pendingCount} pending` : (pendingResources.length > 0 ? 'Active' : ''),
     });
 
     // Set the primary active incident — prefer one with AI analysis, else highest severity
