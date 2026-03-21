@@ -166,7 +166,27 @@ export async function dbInsertIncident(
   const { data: inserted, error } = await supabase
     .from('incidents').insert(row).select().single();
   if (error) throw new Error(`dbInsertIncident failed: ${error.message}`);
-  return rowToIncident(inserted);
+  const incident = rowToIncident(inserted);
+
+  // Fire-and-forget Telegram notification for all new incidents
+  if (process.env.TELEGRAM_BOT_TOKEN) {
+    import('@/lib/integrations/telegram').then(({ notifyTelegramSubscribers }) => {
+      notifyTelegramSubscribers({
+        id: incident.id,
+        title: incident.title,
+        type: incident.type,
+        severity: incident.severity,
+        status: incident.status,
+        description: incident.description,
+        locationDescription: incident.location?.description ?? incident.location?.address,
+        locationZipCode: incident.location?.zipCode,
+      }).catch((err) => {
+        console.error('[dbInsertIncident] Telegram notify failed (non-fatal):', err);
+      });
+    }).catch(() => {});
+  }
+
+  return incident;
 }
 
 export async function dbGetIncident(id: string): Promise<Incident | null> {
