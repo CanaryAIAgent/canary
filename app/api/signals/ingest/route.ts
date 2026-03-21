@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { getFlashModel } from '@/lib/ai/config';
 import { addSignal, addActivity, updateStats, stats } from '@/lib/data/store';
 import { dbInsertIncident } from '@/lib/db';
+import { notifyTelegramSubscribers } from '@/lib/integrations/telegram';
 
 export const maxDuration = 30;
 
@@ -121,6 +122,22 @@ Choose an appropriate Material Symbols icon name (e.g. "apartment" for structura
           'Signal Processor',
           `Created incident ${incident.id} from ${parsed.data.type} signal`,
         );
+
+        // Fire-and-forget: push Telegram alerts to matching subscribers
+        if (process.env.TELEGRAM_BOT_TOKEN) {
+          notifyTelegramSubscribers({
+            id: incident.id,
+            title: incident.title,
+            type: incident.type,
+            severity: incident.severity,
+            status: incident.status,
+            description: incident.description,
+            locationDescription: incident.location?.description,
+            locationZipCode: incident.location?.zipCode,
+          }).catch((err) =>
+            console.error('[signals/ingest] Telegram notify failed (non-fatal):', err),
+          );
+        }
       } catch (dbErr) {
         console.error('[signals/ingest] DB persist failed (non-fatal):', dbErr);
       }

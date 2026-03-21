@@ -371,3 +371,114 @@ export async function dbListCameraAlerts(filters?: {
   if (error) throw new Error(`dbListCameraAlerts failed: ${error.message}`);
   return (rows ?? []).map(rowToCameraAlert);
 }
+
+// ---------------------------------------------------------------------------
+// Telegram Subscribers
+// ---------------------------------------------------------------------------
+
+export async function dbUpsertTelegramSubscriber(
+  telegramChatId: string,
+  zipCodes: string[] = [],
+  minSeverity: number = 1,
+): Promise<{ id: string; isNew: boolean }> {
+  const existing = await dbGetSubscriberByChatId(telegramChatId);
+  if (existing) {
+    const { error } = await supabase
+      .from('subscribers')
+      .update({ zip_codes: zipCodes, min_severity: minSeverity, is_active: true })
+      .eq('telegram_chat_id', telegramChatId);
+    if (error) throw new Error(`dbUpsertTelegramSubscriber update failed: ${error.message}`);
+    return { id: existing.id, isNew: false };
+  }
+
+  const { data: inserted, error } = await supabase
+    .from('subscribers')
+    .insert({
+      telegram_chat_id: telegramChatId,
+      zip_codes: zipCodes,
+      channels: ['telegram'],
+      min_severity: minSeverity,
+      is_active: true,
+    })
+    .select('id')
+    .single();
+  if (error) throw new Error(`dbUpsertTelegramSubscriber insert failed: ${error.message}`);
+  return { id: inserted.id, isNew: true };
+}
+
+export async function dbGetSubscriberByChatId(
+  telegramChatId: string,
+): Promise<{ id: string; zipCodes: string[]; minSeverity: number; isActive: boolean } | null> {
+  const { data: row, error } = await supabase
+    .from('subscribers')
+    .select('id, zip_codes, min_severity, is_active')
+    .eq('telegram_chat_id', telegramChatId)
+    .single();
+  if (error) {
+    if (error.code === 'PGRST116') return null;
+    throw new Error(`dbGetSubscriberByChatId failed: ${error.message}`);
+  }
+  return row
+    ? { id: row.id, zipCodes: row.zip_codes, minSeverity: row.min_severity, isActive: row.is_active }
+    : null;
+}
+
+export async function dbDeactivateSubscriberByChatId(
+  telegramChatId: string,
+): Promise<boolean> {
+  const { error, count } = await supabase
+    .from('subscribers')
+    .update({ is_active: false })
+    .eq('telegram_chat_id', telegramChatId);
+  if (error) throw new Error(`dbDeactivateSubscriberByChatId failed: ${error.message}`);
+  return (count ?? 0) > 0;
+}
+
+export async function dbGetTelegramSubscribersForIncident(
+  zipCode: string | null,
+  severity: number,
+): Promise<Array<{ telegramChatId: string }>> {
+  // Base filter: active Telegram subscribers whose severity threshold is met
+  const base = supabase
+    .from('subscribers')
+    .select('telegram_chat_id')
+    .eq('is_active', true)
+    .not('telegram_chat_id', 'is', null)
+    .contains('channels', ['telegram'])
+    .lte('min_severity', severity);
+
+  if (!zipCode) {
+    // No zip on the incident — only subscribers who opted into all alerts (empty zip_codes)
+    const { data: rows, error } = await base.eq('zip_codes', '{}');
+    if (error) throw new Error(`dbGetTelegramSubscribersForIncident failed: ${error.message}`);
+    return (rows ?? []).map((r: any) => ({ telegramChatId: r.telegram_chat_id }));
+  }
+
+  // Incident has a zip code — get subscribers who match that zip OR have no zip filter
+  const [withZip, allAlerts] = await Promise.all([
+    base.contains('zip_codes', [zipCode]),
+    supabase
+      .from('subscribers')
+      .select('telegram_chat_id')
+      .eq('is_active', true)
+      .not('telegram_chat_id', 'is', null)
+      .contains('channels', ['telegram'])
+      .lte('min_severity', severity)
+      .eq('zip_codes', '{}'),
+  ]);
+
+  if (withZip.error) throw new Error(`dbGetTelegramSubscribersForIncident failed: ${withZip.error.message}`);
+  if (allAlerts.error) throw new Error(`dbGetTelegramSubscribersForIncident failed: ${allAlerts.error.message}`);
+
+  // Deduplicate by chat_id
+  const seen = new Set<string>();
+  const result: Array<{ telegramChatId: string }> = [];
+  for (const row of [...(withZip.data ?? []), ...(allAlerts.data ?? [])]) {
+    const chatId = (row as any).telegram_chat_id;
+    if (chatId && !seen.has(chatId)) {
+      seen.add(chatId);
+      result.push({ telegramChatId: chatId });
+    }
+  }
+  return result;
+}
