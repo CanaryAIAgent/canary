@@ -16,7 +16,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { ORCHESTRATOR_PROMPT } from './prompts';
 import {
-  fetchMetricsTool,
+  checkShelterCapacityTool,
   createIncidentTool,
   updateIncidentStatusTool,
   fetchRunbookTool,
@@ -248,7 +248,7 @@ export async function runOrchestratorAgent(
       routeToRecovery: routeToRecoveryTool,
       routeToCompliance: routeToComplianceTool,
       routeToRunbook: routeToRunbookTool,
-      fetchMetrics: fetchMetricsTool,
+      checkShelterCapacity: checkShelterCapacityTool,
       createIncident: createIncidentTool,
       updateIncidentStatus: updateIncidentStatusTool,
       fetchRunbook: fetchRunbookTool,

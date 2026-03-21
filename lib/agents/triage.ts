@@ -1,12 +1,13 @@
 /**
  * Canary — Triage Agent
  *
- * Specialist agent for root cause analysis, blast radius assessment,
- * and RTO/RPO estimation. Invoked by the Orchestrator for any incident
- * with severity >= 3.
+ * Specialist agent for physical damage assessment, life-safety risk analysis,
+ * affected population estimation, and emergency resource prioritization.
+ * Applies FEMA ATC-45 rapid assessment and ICS priority classification.
+ * Invoked by the Orchestrator for any incident with severity >= 3.
  *
  * Model: gemini-2.0-flash for speed-critical triage (< 30s target)
- *        gemini-2.5-pro for complex multi-system infrastructure analysis
+ *        gemini-2.5-pro for complex multi-jurisdictional incident analysis
  * Max steps: 15
  * Route: POST /api/agents/triage
  */
@@ -17,13 +18,12 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { TRIAGE_PROMPT } from './prompts';
 import {
-  fetchMetricsTool,
+  checkShelterCapacityTool,
   updateIncidentStatusTool,
   fetchRunbookTool,
   logAgentActionTool,
   notifyHumanTool,
   searchSimilarIncidentsTool,
-  fetchInfrastructureContextTool,
 } from './tools';
 import {
   AIAnalysisSchema,
@@ -312,13 +312,12 @@ export async function runTriageAgent(input: TriageAgentInput): Promise<TriageRes
       calculateRtoRpo: calculateRtoRpoTool,
       generateBlastRadius: generateBlastRadiusTool,
       // Shared tools
-      fetchMetrics: fetchMetricsTool,
+      checkShelterCapacity: checkShelterCapacityTool,
       updateIncidentStatus: updateIncidentStatusTool,
       fetchRunbook: fetchRunbookTool,
       logAgentAction: logAgentActionTool,
       notifyHuman: notifyHumanTool,
       searchSimilarIncidents: searchSimilarIncidentsTool,
-      fetchInfrastructureContext: fetchInfrastructureContextTool,
     },
     stopWhen: stepCountIs(15),
     maxRetries: 2,

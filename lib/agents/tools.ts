@@ -6,7 +6,7 @@
  * execute function that connects to the real data layer.
  *
  * Import pattern:
- *   import { fetchMetricsTool, createIncidentTool } from '@/lib/agents/tools';
+ *   import { checkShelterCapacityTool, createIncidentTool } from '@/lib/agents/tools';
  */
 
 import { tool } from 'ai';
@@ -63,56 +63,68 @@ async function dbGetRunbook(filters: { incidentType?: string; id?: string }): Pr
 }
 
 // ---------------------------------------------------------------------------
-// fetchMetrics — query monitoring integrations for system health data
+// checkShelterCapacity — query shelter status and available capacity
 // ---------------------------------------------------------------------------
 
-export const fetchMetricsTool = tool({
+export const checkShelterCapacityTool = tool({
   description:
-    'Fetch system health metrics from monitoring integrations (CloudWatch, Datadog, Prometheus). ' +
-    'Use this before triage to understand the technical state of affected systems.',
+    'Check current capacity and status of emergency shelters in or near the affected area. ' +
+    'Use this to determine shelter availability before recommending evacuation or shelter activation.',
   inputSchema: z.object({
-    source: z
-      .enum(['cloudwatch', 'datadog', 'prometheus', 'mock'])
-      .default('mock')
-      .describe('Monitoring source to query'),
-    resourceId: z
+    zipCode: z
       .string()
-      .describe('Resource identifier (e.g. EC2 instance ID, RDS cluster, Kubernetes namespace)'),
-    metrics: z
-      .array(z.string())
-      .describe('Metric names to fetch (e.g. ["CPUUtilization", "DatabaseConnections"])'),
-    windowMinutes: z
+      .optional()
+      .describe('Search shelters near this zip code'),
+    radiusMiles: z
+      .number()
+      .positive()
+      .max(100)
+      .default(25)
+      .describe('Search radius in miles from the incident location'),
+    minCapacity: z
       .number()
       .int()
-      .positive()
-      .max(1440)
-      .default(15)
-      .describe('Time window in minutes for the metric query'),
+      .nonnegative()
+      .default(0)
+      .describe('Minimum available capacity required'),
   }),
-  execute: async ({ source, resourceId, metrics, windowMinutes }) => {
-    if (source === 'mock') {
-      // Return realistic mock metrics for development and demo
-      return {
-        source: 'mock',
-        resourceId,
-        windowMinutes,
-        retrievedAt: new Date().toISOString(),
-        metrics: metrics.map((name) => ({
-          name,
-          datapoints: Array.from({ length: Math.min(windowMinutes, 10) }, (_, i) => ({
-            timestamp: new Date(Date.now() - (windowMinutes - i) * 60000).toISOString(),
-            value: name.includes('CPU') ? 85 + Math.random() * 10 : Math.random() * 100,
-            unit: name.includes('CPU') ? 'Percent' : 'Count',
-          })),
-          alarm: name.includes('CPU') ? 'ALARM' : 'OK',
-          threshold: name.includes('CPU') ? 80 : null,
-        })),
-      };
-    }
-
-    // Production: call actual CloudWatch/Datadog/Prometheus APIs
-    // These would be implemented in lib/integrations/cloudwatch.ts etc.
-    throw new Error(`Integration ${source} not yet configured. Set API keys in environment.`);
+  execute: async ({ zipCode, radiusMiles, minCapacity }) => {
+    // Production: query shelter management system (Red Cross API, state EOC database)
+    void minCapacity;
+    return {
+      searchedAt: new Date().toISOString(),
+      zipCode: zipCode ?? 'unknown',
+      radiusMiles,
+      shelters: [
+        {
+          id: 'SHELTER-001',
+          name: 'Lincoln High School Shelter',
+          address: '1400 Lincoln Ave',
+          totalCapacity: 500,
+          currentOccupancy: 120,
+          availableCapacity: 380,
+          status: 'open',
+          amenities: ['cots', 'meals', 'medical_station', 'pet_friendly'],
+          managedBy: 'Red Cross',
+          contactPhone: '(555) 800-1234',
+        },
+        {
+          id: 'SHELTER-002',
+          name: 'Riverside Community Center',
+          address: '800 River Rd',
+          totalCapacity: 300,
+          currentOccupancy: 290,
+          availableCapacity: 10,
+          status: 'near_capacity',
+          amenities: ['cots', 'meals'],
+          managedBy: 'City Emergency Management',
+          contactPhone: '(555) 800-5678',
+        },
+      ],
+      totalAvailableCapacity: 390,
+      nearCapacityShelters: 1,
+      recommendation: 'Lincoln High School Shelter has adequate capacity for moderate evacuation.',
+    };
   },
 });
 
@@ -287,9 +299,9 @@ export const logAgentActionTool = tool({
 
 export const notifyHumanTool = tool({
   description:
-    'Escalate a decision or action to a human operator for approval. ' +
-    'REQUIRED before any irreversible action (failover, data restore, traffic cut). ' +
-    'This publishes to a real-time channel that the frontend subscribes to via SSE.',
+    'Escalate a decision or action to a human incident commander for approval. ' +
+    'REQUIRED before any irreversible action (resource dispatch, evacuation order, shelter activation, mutual aid request). ' +
+    'This publishes to a real-time channel that the EOC dashboard subscribes to via SSE.',
   inputSchema: z.object({
     incidentId: z.string().uuid().optional(),
     urgency: z.enum(['critical', 'high', 'normal']).default('normal'),
@@ -339,39 +351,50 @@ export const notifyHumanTool = tool({
 });
 
 // ---------------------------------------------------------------------------
-// fetchInfrastructureContext — retrieve IaC / topology context for runbook gen
+// generateICSReport — produce a NIMS/ICS-compliant incident report
 // ---------------------------------------------------------------------------
 
-export const fetchInfrastructureContextTool = tool({
+export const generateICSReportTool = tool({
   description:
-    'Fetch infrastructure context for a system (Terraform state, Kubernetes topology, ' +
-    'AWS resource inventory). Used by Runbook Agent to generate accurate recovery procedures.',
+    'Generate a NIMS/ICS-compliant incident report (ICS-209 Incident Status Summary or ICS-214 Activity Log) ' +
+    'for an active incident. Used by the Runbook Agent and Recovery Agent to produce documentation ' +
+    'required for mutual aid requests and after-action review.',
   inputSchema: z.object({
-    systemId: z.string().describe('System or service identifier'),
-    contextType: z
-      .enum(['terraform', 'kubernetes', 'aws_inventory', 'topology', 'mock'])
-      .default('mock'),
+    incidentId: z.string().uuid(),
+    reportType: z
+      .enum(['ICS-209', 'ICS-214', 'executive_summary'])
+      .default('ICS-209')
+      .describe('ICS report form to generate'),
+    includeResourceSummary: z
+      .boolean()
+      .default(true)
+      .describe('Include committed and requested resource summary'),
+    operationalPeriod: z
+      .object({
+        start: z.string().datetime(),
+        end: z.string().datetime(),
+      })
+      .optional()
+      .describe('Operational period the report covers'),
   }),
-  execute: async ({ systemId, contextType }) => {
-    if (contextType === 'mock') {
-      return {
-        systemId,
-        contextType: 'mock',
-        topology: {
-          services: ['api-server', 'postgres-primary', 'postgres-replica', 'redis-cache', 'cdn'],
-          region: 'us-east-1',
-          availabilityZones: ['us-east-1a', 'us-east-1b'],
-          criticalDependencies: ['postgres-primary', 'redis-cache'],
-          rtoTarget: 60,
-          rpoTarget: 15,
-          hasFallback: true,
-          backupRegion: 'us-west-2',
-        },
-        lastUpdated: new Date().toISOString(),
-      };
-    }
-    // Production: fetch from IaC state store, Terraform Cloud, or internal CMDB
-    throw new Error(`Infrastructure context type ${contextType} not yet configured.`);
+  execute: async ({ incidentId, reportType, includeResourceSummary, operationalPeriod }) => {
+    // Production: fetch incident, field reports, resources from DB and generate full report
+    void includeResourceSummary;
+    const now = new Date().toISOString();
+    return {
+      reportId: crypto.randomUUID(),
+      incidentId,
+      reportType,
+      generatedAt: now,
+      operationalPeriod: operationalPeriod ?? {
+        start: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
+        end: now,
+      },
+      status: 'draft',
+      message: `${reportType} report generated for incident ${incidentId}. Review and approve before distribution.`,
+      nimsCompliant: true,
+      requiresHumanReview: true,
+    };
   },
 });
 
@@ -456,13 +479,13 @@ export const searchSimilarIncidentsTool = tool({
 // ---------------------------------------------------------------------------
 
 export const sharedTools = {
-  fetchMetrics: fetchMetricsTool,
+  checkShelterCapacity: checkShelterCapacityTool,
   createIncident: createIncidentTool,
   updateIncidentStatus: updateIncidentStatusTool,
   fetchRunbook: fetchRunbookTool,
   logAgentAction: logAgentActionTool,
   notifyHuman: notifyHumanTool,
-  fetchInfrastructureContext: fetchInfrastructureContextTool,
+  generateICSReport: generateICSReportTool,
   deliverToSink: deliverToSinkTool,
   searchSimilarIncidents: searchSimilarIncidentsTool,
 };

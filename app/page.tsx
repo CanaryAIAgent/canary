@@ -5,29 +5,29 @@
 const metrics = [
   {
     label: "Active Incidents",
-    value: "03",
-    sub: "+1/hr",
+    value: "14",
+    sub: "+2/hr",
     subColor: "text-error",
     accent: true,
   },
   {
-    label: "Agent Actions",
-    value: "12",
-    sub: "Pending approval",
+    label: "Resource Requests",
+    value: "08",
+    sub: "Pending",
     subColor: "text-tertiary",
     accent: false,
   },
   {
-    label: "MTTR Estimate",
-    value: "8.4m",
+    label: "Deployment ETA",
+    value: "4.2m",
     sub: "avg",
     subColor: "text-on-surface-variant",
     accent: false,
   },
   {
-    label: "System Health",
-    value: "96%",
-    sub: "✓",
+    label: "Signal Health",
+    value: "98%",
+    sub: "✓ verified",
     subColor: "text-tertiary",
     accent: false,
   },
@@ -35,32 +35,32 @@ const metrics = [
 
 const signalCards = [
   {
-    tag: "CRITICAL // RDS",
+    tag: "CRITICAL // FIELD",
     tagColor: "text-error",
-    title: "Database Replica Lag",
-    desc: "Replication lag on us-east-1 RDS cluster exceeded 45s threshold. Primary health check degraded. Potential data-loss window open.",
-    source: "Telemetry Validated",
-    credibility: 97,
+    title: "Structural Collapse — Oak St",
+    desc: "Three-story residential at 1204 Oak Street confirmed partial collapse. Two individuals reported trapped on second floor. Heavy rescue required immediately.",
+    source: "Field Responder",
+    credibility: 96,
     credibilityColor: "bg-tertiary",
     time: "1:42m ago",
-    icon: "storage",
+    icon: "apartment",
   },
   {
-    tag: "LIVE // ECS",
+    tag: "LIVE // CAMERA",
     tagColor: "text-error",
-    title: "Container Fleet Degraded",
-    desc: "3 of 12 ECS tasks in us-west-2 unhealthy. ALB health checks failing. Traffic shifted to remaining capacity at 78% load.",
-    source: "CloudWatch Alerts",
+    title: "Flood Water Rising — SR-24",
+    desc: "CAM-047 detects water level exceeding 3ft on State Route 24 at mile marker 12. Vehicle passage no longer safe. AI confidence: 91%.",
+    source: "Camera Feed AI",
     credibility: 91,
     credibilityColor: "bg-tertiary",
     time: "4:08m ago",
-    icon: "cloud_queue",
+    icon: "videocam",
   },
   {
     tag: "SOCIAL // X",
     tagColor: "text-on-surface-variant",
-    title: "Latency Reports Spike",
-    desc: "Volume spike in mentions of 'slow' and 'down' from accounts linked to customer segment. 480 unique mentions in 10m window.",
+    title: "Distress Reports Spike",
+    desc: "Volume spike in posts mentioning 'trapped' and 'help' from @handles geolocated to Sector 7. 480 unique posts in 10m. Corroborates field report INC-042.",
     source: "Social Intelligence",
     credibility: 61,
     credibilityColor: "bg-error",
@@ -68,26 +68,26 @@ const signalCards = [
     icon: "person_search",
   },
   {
-    tag: "VERIFIED // ROUTE53",
+    tag: "VERIFIED // SHELTER",
     tagColor: "text-tertiary",
-    title: "DNS Failover Triggered",
-    desc: "Route 53 health check failed for api.acme.com. Automatic failover to secondary region initiated. Propagation in progress.",
-    source: "Verified Signal",
+    title: "Riverside HS At Capacity",
+    desc: "Primary shelter Riverside High School has reached 94% occupancy (1,410 of 1,500). Red Cross requesting activation of secondary shelter at Memorial Civic Center.",
+    source: "Verified Report",
     credibility: 99,
     credibilityColor: "bg-tertiary",
     time: "11:20m ago",
-    icon: "dns",
+    icon: "home_work",
   },
   {
-    tag: "MONITOR // VPC",
+    tag: "MONITOR // ROUTE 17",
     tagColor: "text-on-surface-variant",
-    title: "Anomalous Egress Traffic",
-    desc: "VPC flow logs show 4× baseline egress from subnet 10.0.4.0/24 to external IPs. Doesn't match known deployment patterns.",
+    title: "Road Passability Unknown",
+    desc: "No field team has reached Route 17 bridge crossing. Last known status from 18m ago: passable. Storm surge models suggest imminent inundation risk.",
     source: "Traffic Monitor",
     credibility: 54,
     credibilityColor: "bg-error",
     time: "18:33m ago",
-    icon: "network_check",
+    icon: "road",
   },
   {
     tag: null,
@@ -103,17 +103,17 @@ const signalCards = [
 ];
 
 const auditLog = [
-  { actor: "Triage Agent", action: "Root cause isolated to RDS replication slot overflow.", time: "1m" },
-  { actor: "Orchestrator", action: "Recovery Agent dispatched to execute replica promotion runbook.", time: "2m" },
-  { actor: "Base", action: "Runbook step 3/7 complete. Promoting read replica to primary.", time: "4m" },
+  { actor: "Triage Agent", action: "Structural collapse at Oak St confirmed by cross-referencing 3 field reports and 2 camera feeds.", time: "1m" },
+  { actor: "Orchestrator", action: "Heavy Rescue Unit 12 recommended for dispatch based on proximity and availability.", time: "2m" },
+  { actor: "EOC Base", action: "Shelter capacity alert triggered. Memorial Civic Center pre-notification sent.", time: "4m" },
 ];
 
 const navItems = [
   { icon: "sensors", label: "Dashboard", active: true },
-  { icon: "search_activity", label: "Signal Feed", active: false },
-  { icon: "description", label: "Runbooks", active: false },
-  { icon: "verified_user", label: "Compliance", active: false },
-  { icon: "terminal", label: "Agent Logs", active: false },
+  { icon: "assignment", label: "Field Reports", active: false },
+  { icon: "cell_tower", label: "Social Feed", active: false },
+  { icon: "videocam", label: "Camera Feeds", active: false },
+  { icon: "local_shipping", label: "Resources", active: false },
 ];
 
 export default function Dashboard() {
@@ -165,7 +165,7 @@ export default function Dashboard() {
           </div>
           <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
             <span className="text-sm font-semibold text-on-surface">Operator 01</span>
-            <span className="text-[10px] text-on-surface-variant">Lead Engineer</span>
+            <span className="text-[10px] text-on-surface-variant">Incident Commander</span>
           </div>
         </div>
       </aside>
@@ -180,15 +180,15 @@ export default function Dashboard() {
             <h1 className="font-bold text-base tracking-tighter text-on-surface">
               Canary
               <span className="font-normal text-on-surface-variant ml-2 text-sm hidden sm:inline">
-                | INC-001
+                | INC-042
               </span>
             </h1>
           </div>
 
           <nav className="hidden md:flex items-center gap-6" aria-label="Section navigation">
             <a className="text-xs font-semibold tracking-widest uppercase text-tertiary px-2 py-1" href="#">Dashboard</a>
-            <a className="text-xs font-semibold tracking-widest uppercase text-on-surface-variant hover:text-on-surface hover:bg-surface-bright/50 transition-colors px-2 py-1 rounded" href="#">Runbooks</a>
-            <a className="text-xs font-semibold tracking-widest uppercase text-on-surface-variant hover:text-on-surface hover:bg-surface-bright/50 transition-colors px-2 py-1 rounded" href="#">Compliance</a>
+            <a className="text-xs font-semibold tracking-widest uppercase text-on-surface-variant hover:text-on-surface hover:bg-surface-bright/50 transition-colors px-2 py-1 rounded" href="#">Field Reports</a>
+            <a className="text-xs font-semibold tracking-widest uppercase text-on-surface-variant hover:text-on-surface hover:bg-surface-bright/50 transition-colors px-2 py-1 rounded" href="#">Resources</a>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -232,7 +232,7 @@ export default function Dashboard() {
           {/* ── Main two-column content ────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-            {/* LEFT — System topology + signal stream ─────────────── */}
+            {/* LEFT — Incident header + signal stream ─────────────── */}
             <div className="lg:col-span-7 space-y-10">
 
               {/* Incident header card */}
@@ -249,42 +249,42 @@ export default function Dashboard() {
                       </span>
                     </div>
                     <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2 text-on-surface">
-                      RDS Cluster Degradation
+                      Hurricane Helene — Sector 7 Inundation
                     </h2>
                     <p className="text-on-surface-variant text-sm leading-relaxed max-w-md">
-                      Replication failure on primary us-east-1 database cluster. Blast radius: 3 downstream services. RTO window: 12 minutes.
+                      Storm surge flooding across coastal sectors 4–9. 847 residents in affected zones. Field teams report road impassability on Route 17 and SR-24. Primary shelter at Riverside High School at 94% capacity.
                     </p>
                   </div>
                   <div className="mt-6 flex flex-wrap gap-3">
                     <button
                       className="bg-tertiary-gradient px-5 py-2 rounded-lg text-white font-semibold text-sm flex items-center gap-2 hover:opacity-90 transition-opacity active:scale-95"
-                      aria-label="Deploy response"
+                      aria-label="Deploy resources to incident"
                     >
                       <span className="material-symbols-outlined text-[16px]">emergency</span>
-                      Deploy Recovery
+                      Deploy Resources
                     </button>
                     <button
                       className="px-5 py-2 bg-secondary-container text-on-secondary-container font-semibold text-sm rounded-lg hover:bg-surface-bright transition-colors"
-                      aria-label="View full incident report"
+                      aria-label="Generate incident report"
                     >
-                      Full Report
+                      Generate Report
                     </button>
                   </div>
                 </div>
 
-                {/* Global system status mini-card */}
+                {/* Field operation status mini-card */}
                 <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-xl p-5 flex flex-col justify-between">
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
-                        System Load
+                        Field Status
                       </span>
                       <span className="material-symbols-outlined text-tertiary text-[18px]">shield</span>
                     </div>
                     {[
-                      { label: "CPU Cluster", pct: 68 },
-                      { label: "DB Connections", pct: 89, warn: true },
-                      { label: "Signal Integrity", pct: 96 },
+                      { label: "Field Teams Active", pct: 72 },
+                      { label: "Shelter Capacity", pct: 94, warn: true },
+                      { label: "Comms Signal", pct: 97 },
                     ].map((bar) => (
                       <div key={bar.label} className="space-y-1.5">
                         <div className="flex justify-between text-xs">
@@ -302,7 +302,7 @@ export default function Dashboard() {
                   </div>
                   <div className="pt-4 border-t border-outline-variant/15 mt-2">
                     <span className="text-[10px] text-on-surface-variant font-mono">
-                      OPERATOR: 01 // STATION: ALPHA
+                      STATION: EOC ALPHA // OPS: ACTIVE
                     </span>
                   </div>
                 </div>
@@ -313,7 +313,7 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h3 className="text-base font-semibold text-on-surface">Live Signal Stream</h3>
-                    <p className="text-on-surface-variant text-xs mt-0.5">Correlated signals within active blast radius</p>
+                    <p className="text-on-surface-variant text-xs mt-0.5">Correlated signals from active incident area</p>
                   </div>
                   <button className="text-tertiary text-xs font-bold uppercase tracking-widest hover:bg-surface-bright/50 px-3 py-1.5 rounded-lg transition-colors">
                     View All
@@ -321,7 +321,7 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex items-center gap-3 overflow-x-auto pb-3 scrollbar-thin mb-6">
-                  {["All Signals", "CloudWatch", "Social Intel", "Telemetry", "Logs", "Sat-Comms"].map((f, i) => (
+                  {["All Signals", "Field Reports", "Social Intel", "Camera Feeds", "Voice Notes"].map((f, i) => (
                     <button
                       key={f}
                       className={`flex-shrink-0 px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase transition-colors ${
@@ -415,7 +415,7 @@ export default function Dashboard() {
                       <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2rem]">
                         AI Strategy Recommendation
                       </p>
-                      <p className="text-tertiary text-sm font-medium">Confidence Score: 91.7%</p>
+                      <p className="text-tertiary text-sm font-medium">Confidence Score: 94.1%</p>
                     </div>
                   </div>
 
@@ -426,17 +426,17 @@ export default function Dashboard() {
                         Action Sequence
                       </p>
                       <p className="text-on-surface text-base font-medium leading-snug">
-                        Promote us-east-1 read replica to primary; reroute application traffic via Route 53 weighted policy.
+                        Dispatch Heavy Rescue Unit 12 to 1204 Oak Street; activate Memorial Civic Center as secondary shelter to relieve Riverside HS capacity pressure.
                       </p>
                     </div>
 
                     {/* Stats */}
                     <div className="space-y-3">
                       {[
-                        { label: "Data Loss Exposure", value: "~8s RPO" },
-                        { label: "Estimated RTO", value: "4.2 min" },
+                        { label: "Affected Residents", value: "~847" },
+                        { label: "Est. Response Time", value: "6.4 min" },
                         { label: "Success Probability", value: "High" },
-                        { label: "Affected Services", value: "3 of 11" },
+                        { label: "Resources Available", value: "7 of 11" },
                       ].map((stat) => (
                         <div
                           key={stat.label}
@@ -449,12 +449,12 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* CTA buttons — destructive action requires explicit confirm */}
+                  {/* CTA buttons */}
                   <button
                     className="w-full py-3.5 rounded-xl bg-tertiary-gradient text-white font-bold text-sm tracking-widest uppercase shadow-lg shadow-tertiary/20 hover:opacity-90 transition-all flex items-center justify-center gap-3 group active:scale-95 duration-100"
-                    aria-label="Approve replica promotion and traffic failover"
+                    aria-label="Approve resource dispatch"
                   >
-                    Approve Failover
+                    Approve Dispatch
                     <span className="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">
                       chevron_right
                     </span>
@@ -467,11 +467,11 @@ export default function Dashboard() {
                   </button>
                 </div>
 
-                {/* Active comms / audit log */}
+                {/* Field activity log */}
                 <div className="bg-surface-container-low rounded-xl p-5 space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">
-                      Agent Audit Log
+                      Field Activity Log
                     </span>
                     <span className="text-[10px] text-tertiary bg-tertiary/10 px-2 py-0.5 rounded-full">
                       Live
@@ -491,23 +491,23 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* Runbook progress */}
+                {/* Response protocol */}
                 <div className="bg-surface-container-low rounded-xl p-5">
                   <div className="flex justify-between items-center mb-4">
                     <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">
-                      Runbook: RDS Failover v3.1
+                      Response Protocol: INC-042 v2.1
                     </span>
-                    <span className="text-[10px] text-tertiary font-mono">3 / 7</span>
+                    <span className="text-[10px] text-tertiary font-mono">4 / 7</span>
                   </div>
                   <div className="space-y-2">
                     {[
-                      { step: "Verify replica health", done: true },
-                      { step: "Pause application writes", done: true },
-                      { step: "Promote replica to primary", done: true },
-                      { step: "Update connection strings", done: false, active: true },
-                      { step: "Re-enable application writes", done: false },
-                      { step: "Validate data integrity", done: false },
-                      { step: "Close incident", done: false },
+                      { step: "Assess structural stability — Oak St", done: true },
+                      { step: "Deploy heavy rescue to Oak St", done: true },
+                      { step: "Establish perimeter — 100m radius", done: true },
+                      { step: "Coordinate medical triage on-site", done: false, active: true },
+                      { step: "Activate secondary shelter — Memorial CC", done: false },
+                      { step: "Clear Route 17 bridge for emergency access", done: false },
+                      { step: "File ICS-214 incident report", done: false },
                     ].map((s, i) => (
                       <div key={i} className="flex items-center gap-3">
                         <div
@@ -555,9 +555,9 @@ export default function Dashboard() {
       >
         {[
           { icon: "sensors", label: "Home", active: true },
-          { icon: "search_activity", label: "Feed", active: false },
+          { icon: "assignment", label: "Field", active: false },
+          { icon: "cell_tower", label: "Social", active: false },
           { icon: "explore", label: "Map", active: false },
-          { icon: "shield", label: "Secure", active: false },
         ].map((item) => (
           <button
             key={item.label}
