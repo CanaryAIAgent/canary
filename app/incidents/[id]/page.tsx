@@ -56,6 +56,27 @@ interface PhotoAnalysisData {
   };
 }
 
+interface ActivityEntry {
+  id: string;
+  actor: string;
+  action: string;
+  time: string;
+}
+
+interface AiRecommendation {
+  actionSequence: string;
+  confidenceScore: number;
+  stats: Array<{ label: string; value: string }>;
+  ctaLabel: string;
+}
+
+interface DashboardProtocolStep {
+  id: string;
+  step: string;
+  done: boolean;
+  active?: boolean;
+}
+
 interface AgentLog {
   id: string;
   agentType: string;
@@ -150,6 +171,11 @@ export default function IncidentDetailPage() {
   const [resourceSubmitting, setResourceSubmitting] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Triage panel state (from /api/dashboard)
+  const [aiRec, setAiRec] = useState<AiRecommendation | null>(null);
+  const [auditLog, setAuditLog] = useState<ActivityEntry[]>([]);
+  const [dashProtocol, setDashProtocol] = useState<DashboardProtocolStep[]>([]);
+
   // Swarm state
   const [swarmRunning, setSwarmRunning] = useState(false);
   const [swarmResults, setSwarmResults] = useState<{
@@ -213,6 +239,23 @@ export default function IncidentDetailPage() {
     const interval = setInterval(fetchIncident, 30_000);
     return () => clearInterval(interval);
   }, [incidentId]);
+
+  // Fetch triage panel data from dashboard
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        const res = await fetch("/api/dashboard");
+        if (!res.ok) return;
+        const json = await res.json();
+        setAiRec(json.aiRecommendation ?? null);
+        setAuditLog(json.activity ?? []);
+        setDashProtocol(json.protocolSteps ?? []);
+      } catch { /* silent */ }
+    };
+    fetchDashboard();
+    const interval = setInterval(fetchDashboard, 15_000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Publish handler
   const handlePublish = async () => {
@@ -756,6 +799,126 @@ export default function IncidentDetailPage() {
           </div>
         </section>
 
+        {/* ── Photo Analysis ──────────────────────────────── */}
+        {analysis?.summary && (
+          <section className="mb-10">
+            <div className="bg-surface-container-low border border-outline-variant/15 rounded-xl p-6 space-y-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-tertiary/10 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-tertiary text-[20px]">photo_camera</span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-on-surface">Photo Analysis</p>
+                  <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">
+                    AI-generated assessment from uploaded imagery
+                  </p>
+                </div>
+              </div>
+
+              {/* Summary */}
+              <p className="text-sm text-on-surface leading-relaxed">{analysis.summary}</p>
+
+              {/* Key metrics */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {analysis.severity != null && (
+                  <div className="p-3 bg-surface-container-lowest rounded-lg border border-outline-variant/10">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Severity</span>
+                    <p className={`text-xl font-bold mt-1 ${analysis.severity >= 4 ? "text-error" : "text-on-surface"}`}>
+                      {analysis.severity}/5
+                    </p>
+                  </div>
+                )}
+                {analysis.confidence != null && (
+                  <div className="p-3 bg-surface-container-lowest rounded-lg border border-outline-variant/10">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Confidence</span>
+                    <p className="text-xl font-bold mt-1 text-tertiary">{Math.round(analysis.confidence * 100)}%</p>
+                  </div>
+                )}
+                {analysis.structuralIntegrity && (
+                  <div className="p-3 bg-surface-container-lowest rounded-lg border border-outline-variant/10">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Structure</span>
+                    <p className="text-xs font-semibold mt-1.5 text-on-surface capitalize">{String(analysis.structuralIntegrity).replace(/_/g, " ")}</p>
+                  </div>
+                )}
+                {analysis.damageCategory && (
+                  <div className="p-3 bg-surface-container-lowest rounded-lg border border-outline-variant/10">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Damage Category</span>
+                    <p className="text-xs font-semibold mt-1.5 text-on-surface">{String(analysis.damageCategory)}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Hazards */}
+              {Array.isArray(analysis.hazards) && analysis.hazards.length > 0 && (
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Detected Hazards</span>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {(analysis.hazards as string[]).map((h: string, i: number) => (
+                      <span key={i} className="px-2.5 py-1 text-[10px] font-semibold bg-error/10 text-error rounded-full">
+                        {h}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Detected objects */}
+              {Array.isArray(analysis.detectedObjects) && analysis.detectedObjects.length > 0 && (
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Detected Objects</span>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {(analysis.detectedObjects as string[]).map((o: string, i: number) => (
+                      <span key={i} className="px-2.5 py-1 text-[10px] font-semibold bg-surface-container-highest text-on-surface-variant rounded-full">
+                        {o}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Recommended actions */}
+              {Array.isArray(analysis.recommendedActions) && analysis.recommendedActions.length > 0 && (
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Recommended Actions</span>
+                  <ul className="mt-2 space-y-1.5">
+                    {(analysis.recommendedActions as string[]).map((a: string, i: number) => (
+                      <li key={i} className="flex items-start gap-2 text-xs text-on-surface">
+                        <span className="text-tertiary mt-0.5">•</span>
+                        {a}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Resource recommendations */}
+              {Array.isArray(analysis.resourceRecommendations) && analysis.resourceRecommendations.length > 0 && (
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Resource Needs</span>
+                  <div className="mt-2 space-y-1.5">
+                    {(analysis.resourceRecommendations as Array<{ type: string; priority: string; quantity?: number }>).map((r, i) => (
+                      <div key={i} className="flex items-center justify-between text-xs p-2 bg-surface-container-lowest rounded-lg border border-outline-variant/10">
+                        <span className="text-on-surface font-medium">{r.type}</span>
+                        <span className={`text-[10px] font-bold uppercase ${r.priority === "immediate" ? "text-error" : r.priority === "urgent" ? "text-tertiary" : "text-on-surface-variant"}`}>
+                          {r.priority}{r.quantity ? ` × ${r.quantity}` : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Extracted address */}
+              {analysis.extractedAddress && (
+                <div className="flex items-center gap-1.5 text-xs text-on-surface-variant pt-2 border-t border-outline-variant/10">
+                  <span className="material-symbols-outlined text-[14px]">location_on</span>
+                  {String(analysis.extractedAddress)}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         {/* ── Two-column layout ────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* LEFT — Timeline + Protocol ──────────────────── */}
@@ -1006,9 +1169,221 @@ export default function IncidentDetailPage() {
             )}
           </div>
 
-          {/* RIGHT — AI Chat panel ───────────────────────── */}
+          {/* RIGHT — Triage panel + AI Chat ────────────────── */}
           <div className="lg:col-span-5">
-            <div className="lg:sticky lg:top-20">
+            <div className="lg:sticky lg:top-20 space-y-5">
+
+              {/* AI Strategy Recommendation card */}
+              <div className="bg-surface-container-high rounded-2xl p-7 border border-outline-variant/20 shadow-[0_0_32px_0_rgba(231,229,228,0.08)]">
+                <div className="flex items-center gap-3 mb-7">
+                  <div className="w-10 h-10 rounded-full bg-tertiary/10 flex items-center justify-center">
+                    <span className="text-tertiary text-xs font-bold">AI</span>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-[0.2rem]">
+                      AI Strategy Recommendation
+                    </p>
+                    <p className="text-tertiary text-sm font-medium">
+                      Confidence Score: {aiRec && aiRec.confidenceScore > 0 ? `${aiRec.confidenceScore}%` : "\u2014"}
+                    </p>
+                  </div>
+                </div>
+
+                {(!aiRec || aiRec.confidenceScore === 0) ? (
+                  <div className="py-8 flex flex-col items-center text-center">
+                    <div className="w-14 h-14 rounded-full bg-surface-container-lowest flex items-center justify-center mb-4">
+                      <span className="material-symbols-outlined text-2xl text-outline-variant">psychology</span>
+                    </div>
+                    <p className="text-sm font-semibold text-on-surface-variant mb-1">Waiting for AI analysis</p>
+                    <p className="text-xs text-on-surface-variant/70 max-w-[240px] mb-5">
+                      Report signals or run triage to get strategic recommendations from the AI.
+                    </p>
+                    <button
+                      onClick={() => {
+                        if (incident) {
+                          sendQuickAction(`Run triage analysis on incident "${incident.title}" (ID: ${incident.id}, type: ${incident.type}, severity: ${incident.severity}). Assess root cause, blast radius, affected population, and recommend immediate actions. Push your findings to the dashboard recommendation panel and set a response protocol.`);
+                        }
+                      }}
+                      className="px-4 py-2 rounded-lg bg-secondary-container text-on-secondary-container font-semibold text-xs hover:bg-surface-bright transition-colors flex items-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">neurology</span>
+                      Run Triage
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-5 mb-8">
+                      <div className="p-5 bg-surface-container-lowest rounded-xl border-l-2 border-tertiary">
+                        <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-2">
+                          Action Sequence
+                        </p>
+                        <p className="text-on-surface text-base font-medium leading-snug">
+                          {aiRec.actionSequence || "\u2014"}
+                        </p>
+                      </div>
+
+                      {(aiRec.stats ?? []).length > 0 && (
+                        <div className="space-y-3">
+                          {(aiRec.stats ?? []).map((stat) => (
+                            <div
+                              key={stat.label}
+                              className="flex justify-between items-center text-sm border-b border-outline-variant/10 pb-2 last:border-0"
+                            >
+                              <span className="text-on-surface-variant">{stat.label}</span>
+                              <span className="text-on-surface font-mono">{stat.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {incident?.status === "responding" ? (
+                      <div className="w-full py-3.5 rounded-xl bg-tertiary/15 text-tertiary font-bold text-sm tracking-widest uppercase flex items-center justify-center gap-3">
+                        <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                        Dispatched — Responding
+                      </div>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          if (!incident) return;
+                          try {
+                            const res = await fetch("/api/dashboard/approve", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ incidentId: incident.id }),
+                            });
+                            const result = await res.json();
+                            if (result.success) {
+                              const [incRes, dashRes] = await Promise.all([
+                                fetch(`/api/incidents/${incidentId}`),
+                                fetch("/api/dashboard"),
+                              ]);
+                              if (incRes.ok) {
+                                const incJson = await incRes.json();
+                                setIncident(incJson.incident);
+                              }
+                              if (dashRes.ok) {
+                                const dashJson = await dashRes.json();
+                                setAiRec(dashJson.aiRecommendation ?? null);
+                                setAuditLog(dashJson.activity ?? []);
+                                setDashProtocol(dashJson.protocolSteps ?? []);
+                              }
+                            }
+                          } catch {
+                            console.error("[approve] failed");
+                          }
+                        }}
+                        className="w-full py-3.5 rounded-xl bg-tertiary-gradient text-white font-bold text-sm tracking-widest uppercase shadow-lg shadow-tertiary/20 hover:opacity-90 transition-all flex items-center justify-center gap-3 active:scale-95 duration-100"
+                        aria-label="Approve resource dispatch"
+                      >
+                        {aiRec.ctaLabel ?? "Approve Dispatch"}
+                      </button>
+                    )}
+                    {incident?.status !== "responding" && (
+                      <button
+                        onClick={() => {
+                          setAiRec({ actionSequence: "", confidenceScore: 0, stats: [], ctaLabel: "Approve Dispatch" });
+                          fetch("/api/dashboard/dismiss", { method: "POST" }).catch(() => {});
+                        }}
+                        className="w-full mt-3 py-2.5 rounded-xl bg-surface-container-highest text-on-surface-variant font-semibold text-xs tracking-widest uppercase hover:text-on-surface transition-colors"
+                        aria-label="Dismiss recommendation and override manually"
+                      >
+                        Dismiss &amp; Manual Override
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Field Activity Log */}
+              <div className="bg-surface-container-low rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">
+                    Field Activity Log
+                  </span>
+                  <span className="text-[10px] text-tertiary bg-tertiary/10 px-2 py-0.5 rounded-full">
+                    Live
+                  </span>
+                </div>
+                <div className="space-y-3">
+                  {auditLog.length === 0 ? (
+                    <div className="py-6 flex flex-col items-center text-center">
+                      <span className="material-symbols-outlined text-xl text-outline-variant mb-2">history</span>
+                      <p className="text-xs text-on-surface-variant">No activity yet</p>
+                      <p className="text-[10px] text-on-surface-variant/50 mt-0.5">Actions and events will appear here in real time.</p>
+                    </div>
+                  ) : (
+                    auditLog.map((entry, i) => (
+                      <div key={entry.id ?? i} className="flex gap-3 items-start">
+                        <div className="w-1.5 h-1.5 rounded-full bg-secondary shrink-0 mt-1.5" />
+                        <p className="text-xs text-on-surface/80">
+                          <span className="font-bold text-on-surface">{entry.actor}:</span>{" "}
+                          {entry.action}{" "}
+                          <span className="text-on-surface-variant font-mono">{entry.time === "0m" ? "just now" : `${entry.time} ago`}</span>
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Response Protocol */}
+              <div className="bg-surface-container-low rounded-xl p-5">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">
+                    Response Protocol
+                  </span>
+                  {dashProtocol.length > 0 && (
+                    <span className="text-[10px] text-tertiary font-mono">
+                      {dashProtocol.filter((s) => s.done).length} / {dashProtocol.length}
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {dashProtocol.length === 0 ? (
+                    <div className="py-6 flex flex-col items-center text-center">
+                      <span className="material-symbols-outlined text-xl text-outline-variant mb-2">checklist</span>
+                      <p className="text-xs text-on-surface-variant">No active protocol</p>
+                      <p className="text-[10px] text-on-surface-variant/50 mt-0.5">Protocol steps will be set when an incident response plan is activated.</p>
+                    </div>
+                  ) : (
+                    dashProtocol.map((s, i) => (
+                      <div key={s.id ?? i} className="flex items-center gap-3">
+                        <div
+                          className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+                            s.done
+                              ? "bg-tertiary/20"
+                              : s.active
+                              ? "bg-surface-container-highest border border-tertiary/40"
+                              : "bg-surface-container-highest"
+                          }`}
+                        >
+                          {s.done ? (
+                            <span className="material-symbols-outlined text-tertiary text-[12px]">check</span>
+                          ) : s.active ? (
+                            <span className="w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse" />
+                          ) : (
+                            <span className="w-1.5 h-1.5 rounded-full bg-outline-variant/50" />
+                          )}
+                        </div>
+                        <span
+                          className={`text-xs ${
+                            s.done
+                              ? "line-through text-on-surface-variant"
+                              : s.active
+                              ? "text-on-surface font-medium"
+                              : "text-on-surface-variant"
+                          }`}
+                        >
+                          {s.step}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* AI Chat panel */}
               <div className="bg-surface-container-high rounded-2xl border border-outline-variant/20 shadow-[0_0_32px_0_rgba(231,229,228,0.08)] overflow-hidden flex flex-col" style={{ height: "min(640px, calc(100dvh - 8rem))" }}>
                 {/* Chat header */}
                 <div className="flex items-center justify-between px-5 py-3 border-b border-outline-variant/15 shrink-0">
