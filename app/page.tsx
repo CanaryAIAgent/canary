@@ -512,6 +512,12 @@ export default function Dashboard() {
 
     try {
       const res = await fetch("/api/photos/analyze", { method: "POST", body: formData });
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/json")) {
+        const text = await res.text();
+        setAnalysisError(`Server error (${res.status}): ${text.slice(0, 200)}`);
+        return;
+      }
       const json = await res.json();
       if (json.success) {
         setAnalysisResult(json.data);
@@ -519,8 +525,9 @@ export default function Dashboard() {
       } else {
         setAnalysisError(json.error?.message ?? "Analysis failed");
       }
-    } catch {
-      setAnalysisError("Failed to reach photo analysis API");
+    } catch (err) {
+      console.error("[photos] error:", err);
+      setAnalysisError(err instanceof Error ? err.message : "Failed to reach photo analysis API");
     } finally {
       setAnalyzing(false);
     }

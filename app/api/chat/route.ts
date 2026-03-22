@@ -307,7 +307,7 @@ export async function POST(req: Request) {
             ].filter(Boolean).join('\n');
 
             const { object: analysis } = await generateObject({
-              model: getPhotoModel('nano-banana'),
+              model: getPhotoModel('flash'),
               schema: PhotoAnalysisResponseSchema,
               messages: [
                 {
