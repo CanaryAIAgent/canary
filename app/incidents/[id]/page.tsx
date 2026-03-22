@@ -9,7 +9,7 @@
  * and publish action. Uses Monolith design system.
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useChat } from "@ai-sdk/react";
@@ -193,10 +193,34 @@ export default function IncidentDetailPage() {
     });
   };
 
+  // Refresh triage panel data from dashboard
+  const refreshTriagePanel = useCallback(() => {
+    fetch("/api/dashboard")
+      .then((r) => r.json())
+      .then((json) => {
+        setAiRec(json.aiRecommendation ?? null);
+        setAuditLog(json.activity ?? []);
+        setDashProtocol(json.protocolSteps ?? []);
+      })
+      .catch(() => {});
+  }, []);
+
   // AI Chat scoped to this incident
   const { messages: chatMessages, sendMessage, status: chatStatus } = useChat({
     transport: new DefaultChatTransport({ api: "/api/chat" }),
+    onFinish: () => {
+      refreshTriagePanel();
+    },
   });
+
+  // Backup refresh: when chat transitions back to "ready"
+  const prevChatStatus = useRef(chatStatus);
+  useEffect(() => {
+    if (prevChatStatus.current !== "ready" && chatStatus === "ready") {
+      refreshTriagePanel();
+    }
+    prevChatStatus.current = chatStatus;
+  }, [chatStatus, refreshTriagePanel]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -217,6 +241,26 @@ export default function IncidentDetailPage() {
         const ai = json.incident?.aiAnalysis as Record<string, unknown> | undefined;
         if (ai?.publicSummary) {
           setPublicUrl(`/status/${incidentId}`);
+        }
+        // Hydrate triage panel from this incident's own aiAnalysis
+        if (ai?.recommendation) {
+          const rec = ai.recommendation as Record<string, unknown>;
+          setAiRec({
+            actionSequence: (rec.actionSequence as string) ?? "",
+            confidenceScore: (rec.confidenceScore as number) ?? 0,
+            stats: (rec.stats as Array<{ label: string; value: string }>) ?? [],
+            ctaLabel: (rec.ctaLabel as string) ?? "Approve Dispatch",
+          });
+        }
+        if (Array.isArray(ai?.protocolSteps)) {
+          setDashProtocol(
+            (ai.protocolSteps as Array<{ step: string; done: boolean; active?: boolean }>).map((s, i) => ({
+              id: `inc-step-${i}`,
+              step: s.step,
+              done: s.done,
+              active: s.active,
+            }))
+          );
         }
         // Detect existing swarm reports
         const swarm = ai?.swarmReports as Record<string, unknown> | undefined;
@@ -240,22 +284,12 @@ export default function IncidentDetailPage() {
     return () => clearInterval(interval);
   }, [incidentId]);
 
-  // Fetch triage panel data from dashboard
+  // Poll triage panel data
   useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        const res = await fetch("/api/dashboard");
-        if (!res.ok) return;
-        const json = await res.json();
-        setAiRec(json.aiRecommendation ?? null);
-        setAuditLog(json.activity ?? []);
-        setDashProtocol(json.protocolSteps ?? []);
-      } catch { /* silent */ }
-    };
-    fetchDashboard();
-    const interval = setInterval(fetchDashboard, 15_000);
+    refreshTriagePanel();
+    const interval = setInterval(refreshTriagePanel, 15_000);
     return () => clearInterval(interval);
-  }, []);
+  }, [refreshTriagePanel]);
 
   // Publish handler
   const handlePublish = async () => {
