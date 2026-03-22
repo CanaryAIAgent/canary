@@ -435,6 +435,15 @@ export default function Dashboard() {
     },
   });
 
+  // Refresh dashboard when chat finishes (backup for onFinish)
+  const prevChatStatus = useRef(chatStatus);
+  useEffect(() => {
+    if (prevChatStatus.current !== "ready" && chatStatus === "ready") {
+      refreshDashboard();
+    }
+    prevChatStatus.current = chatStatus;
+  }, [chatStatus, refreshDashboard]);
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
