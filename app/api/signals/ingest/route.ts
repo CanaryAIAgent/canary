@@ -11,7 +11,7 @@
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { getFlashModel } from '@/lib/ai/config';
-import { addSignal, addActivity, updateStats, stats } from '@/lib/data/store';
+import { addSignal, addActivity, updateStats, updateRecommendation, stats } from '@/lib/data/store';
 import { dbInsertIncident } from '@/lib/db';
 
 export const maxDuration = 30;
@@ -118,6 +118,18 @@ Choose an appropriate Material Symbols icon name (e.g. "apartment" for structura
           'Signal Processor',
           `Created incident ${incident.id} from ${parsed.data.type} signal`,
         );
+
+        // Auto-populate triage panel
+        updateRecommendation({
+          actionSequence: `${analysis.recommendedAction ?? 'Assess situation'}. Signal: "${analysis.title}" — ${analysis.summary}`,
+          confidenceScore: analysis.credibility ?? 70,
+          stats: [
+            { label: 'Severity', value: `${analysis.severity}/5` },
+            { label: 'Source', value: parsed.data.type },
+            { label: 'Category', value: analysis.category },
+          ],
+          ctaLabel: 'Approve Dispatch',
+        });
       } catch (dbErr) {
         console.error('[signals/ingest] DB persist failed (non-fatal):', dbErr);
       }

@@ -17,7 +17,7 @@ import {
   dbInsertAgentLog,
 } from '@/lib/db';
 import { PhotoAnalysisResponseSchema } from '@/lib/schemas';
-import { addSignal, addActivity, updateStats, stats } from '@/lib/data/store';
+import { addSignal, addActivity, updateStats, updateRecommendation, setProtocolSteps, stats } from '@/lib/data/store';
 
 export const maxDuration = 60;
 
@@ -181,6 +181,28 @@ export async function POST(request: Request) {
       updateStats({
         activeIncidents: stats.activeIncidents + 1,
       });
+    }
+
+    // Auto-populate triage panel with analysis
+    updateRecommendation({
+      actionSequence: (analysis.recommendedActions ?? []).join('\n') || analysis.summary || 'Review photo analysis results.',
+      confidenceScore: Math.round((analysis.confidence ?? 0.8) * 100),
+      stats: [
+        { label: 'Severity', value: `${finalSeverity}/5` },
+        { label: 'Hazards', value: String(analysis.hazards?.length ?? 0) },
+        ...(analysis.structuralIntegrity ? [{ label: 'Structure', value: analysis.structuralIntegrity.replace(/_/g, ' ') }] : []),
+      ],
+      ctaLabel: 'Approve Dispatch',
+    });
+
+    if ((analysis.recommendedActions ?? []).length > 0) {
+      setProtocolSteps(
+        analysis.recommendedActions.map((action: string, i: number) => ({
+          step: action,
+          done: false,
+          active: i === 0,
+        })),
+      );
     }
 
     return Response.json({

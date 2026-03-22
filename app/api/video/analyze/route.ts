@@ -19,7 +19,7 @@ import {
   dbUpdateIncident,
   dbInsertAgentLog,
 } from '@/lib/db';
-import { addSignal, addActivity, updateStats, stats } from '@/lib/data/store';
+import { addSignal, addActivity, updateStats, updateRecommendation, setProtocolSteps, stats } from '@/lib/data/store';
 
 export const maxDuration = 120;
 
@@ -257,6 +257,29 @@ export async function POST(request: Request) {
 
     if (isNewIncident) {
       updateStats({ activeIncidents: stats.activeIncidents + 1 });
+    }
+
+    // Auto-populate triage panel with analysis
+    const actions = analysis.recommendedActions ?? [];
+    updateRecommendation({
+      actionSequence: actions.join('\n') || analysis.sceneSummary || analysis.summary || 'Review video analysis results.',
+      confidenceScore: Math.round((analysis.confidence ?? 0.8) * 100),
+      stats: [
+        { label: 'Severity', value: `${finalSeverity}/5` },
+        { label: 'Timeline Events', value: String(analysis.timeline?.length ?? 0) },
+        { label: 'Hazards', value: String(analysis.hazards?.length ?? 0) },
+      ],
+      ctaLabel: 'Approve Dispatch',
+    });
+
+    if (actions.length > 0) {
+      setProtocolSteps(
+        actions.map((action: string, i: number) => ({
+          step: action,
+          done: false,
+          active: i === 0,
+        })),
+      );
     }
 
     return Response.json({

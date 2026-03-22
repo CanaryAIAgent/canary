@@ -12,7 +12,7 @@ import { z } from 'zod';
 import { type XMention } from '@/lib/schemas';
 import { getFlashModel } from '@/lib/ai/config';
 import { supabase, dbInsertIncident, dbInsertAgentLog } from '@/lib/db';
-import { addSignal, addActivity, updateStats, stats } from '@/lib/data/store';
+import { addSignal, addActivity, updateStats, updateRecommendation, stats } from '@/lib/data/store';
 
 export interface XBotHandlerResult {
   reply: string;
@@ -206,6 +206,18 @@ export async function handleXMention(mention: XMention): Promise<XBotHandlerResu
           'X Bot',
           `Created incident from @${mention.authorHandle}: "${analysis.summary.slice(0, 80)}" — severity ${analysis.severity}`,
         );
+
+        // Auto-populate triage panel
+        updateRecommendation({
+          actionSequence: analysis.summary,
+          confidenceScore: Math.round(analysis.confidence * 100),
+          stats: [
+            { label: 'Severity', value: `${analysis.severity}/5` },
+            { label: 'Source', value: `@${mention.authorHandle}` },
+            { label: 'Type', value: analysis.incidentType },
+          ],
+          ctaLabel: 'Approve Dispatch',
+        });
 
         console.log(`[xbot-handler] Created new incident ${incidentId} from mention ${mention.id}`);
       } catch (err) {
