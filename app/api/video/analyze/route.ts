@@ -169,7 +169,21 @@ export async function POST(request: Request) {
     ]);
 
     const responseText = result.response.text();
-    const analysis = JSON.parse(responseText);
+    let analysis;
+    try {
+      analysis = JSON.parse(responseText);
+    } catch {
+      // Model returned non-JSON — extract what we can
+      console.error('[video/analyze] Failed to parse AI response, raw text:', responseText.slice(0, 500));
+      analysis = {
+        summary: responseText.slice(0, 500),
+        severity: severity ?? 3,
+        confidence: 0.5,
+        hazards: [],
+        sceneSummary: responseText.slice(0, 300),
+        timeline: [],
+      };
+    }
 
     const finalSeverity = severity ?? analysis.severity ?? 3;
     let resultIncidentId: string;

@@ -467,11 +467,17 @@ export default function VideoAnalysisPage() {
                   <div className="bg-surface-container-low rounded-xl p-8 flex flex-col items-center text-center py-20">
                     <span className="w-10 h-10 border-3 border-tertiary/30 border-t-tertiary rounded-full animate-spin mb-5" />
                     <p className="text-sm font-semibold text-on-surface uppercase tracking-widest mb-1">
-                      Processing Video
+                      Video Analysis Kicked Off
                     </p>
-                    <p className="text-xs text-on-surface-variant max-w-sm">
-                      Gemini is watching the video and extracting timestamped events, hazards, and damage assessment. This may take a minute.
+                    <p className="text-xs text-on-surface-variant max-w-sm mb-4">
+                      AI is watching the video and extracting timestamped events, hazards, and damage assessment. An incident will be created when analysis completes.
                     </p>
+                    <div className="flex items-center gap-2 px-4 py-2 bg-tertiary/10 rounded-full">
+                      <span className="material-symbols-outlined text-tertiary text-[14px]">info</span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-tertiary">
+                        This may take 30–60 seconds
+                      </span>
+                    </div>
                   </div>
                 )}
 
