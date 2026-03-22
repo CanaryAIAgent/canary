@@ -17,6 +17,7 @@ interface XBotMention {
   tweet_text: string;
   confidence: string;
   ai_response: string | null;
+  incident_id: string | null;
   processed_at: string;
 }
 
@@ -395,6 +396,17 @@ export default function SettingsPage() {
                           {mention.ai_response}
                         </p>
                       </div>
+                    )}
+
+                    {mention.incident_id && (
+                      <Link
+                        href={`/incidents/${mention.incident_id}`}
+                        className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-lg bg-tertiary/10 text-tertiary text-xs font-semibold hover:bg-tertiary/20 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">link</span>
+                        Linked Incident
+                        <span className="material-symbols-outlined text-[12px]">arrow_forward</span>
+                      </Link>
                     )}
                   </div>
                 ))

@@ -11,7 +11,7 @@
  * generateObject does not support video file parts.
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType, type ResponseSchema } from '@google/generative-ai';
 import { GoogleAIFileManager } from '@google/generative-ai/server';
 import {
   dbInsertIncident,
@@ -24,36 +24,36 @@ import { addSignal, addActivity, updateStats, stats } from '@/lib/data/store';
 export const maxDuration = 120;
 
 const RESPONSE_SCHEMA = {
-  type: 'object' as const,
+  type: SchemaType.OBJECT,
   properties: {
-    summary: { type: 'string' as const, description: 'Concise narrative of the incident' },
-    severity: { type: 'number' as const, description: 'Overall severity 1-5' },
-    confidence: { type: 'number' as const, description: 'Confidence 0-1' },
-    hazards: { type: 'array' as const, items: { type: 'string' as const } },
-    sceneSummary: { type: 'string' as const, description: 'Overall scene description' },
-    progressionAnalysis: { type: 'string' as const, description: 'How situation changes over time' },
+    summary: { type: SchemaType.STRING, description: 'Concise narrative of the incident' },
+    severity: { type: SchemaType.NUMBER, description: 'Overall severity 1-5' },
+    confidence: { type: SchemaType.NUMBER, description: 'Confidence 0-1' },
+    hazards: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+    sceneSummary: { type: SchemaType.STRING, description: 'Overall scene description' },
+    progressionAnalysis: { type: SchemaType.STRING, description: 'How situation changes over time' },
     timeline: {
-      type: 'array' as const,
+      type: SchemaType.ARRAY,
       items: {
-        type: 'object' as const,
+        type: SchemaType.OBJECT,
         properties: {
-          timestamp: { type: 'string' as const, description: 'HH:MM:SS format' },
-          seconds: { type: 'number' as const },
-          event: { type: 'string' as const },
-          severity: { type: 'number' as const },
-          category: { type: 'string' as const },
+          timestamp: { type: SchemaType.STRING, description: 'HH:MM:SS format' },
+          seconds: { type: SchemaType.NUMBER },
+          event: { type: SchemaType.STRING },
+          severity: { type: SchemaType.NUMBER },
+          category: { type: SchemaType.STRING },
         },
         required: ['timestamp', 'seconds', 'event', 'severity', 'category'],
       },
     },
-    damageCategory: { type: 'string' as const },
-    structuralIntegrity: { type: 'string' as const },
-    detectedObjects: { type: 'array' as const, items: { type: 'string' as const } },
-    extractedAddress: { type: 'string' as const },
-    recommendedActions: { type: 'array' as const, items: { type: 'string' as const } },
+    damageCategory: { type: SchemaType.STRING },
+    structuralIntegrity: { type: SchemaType.STRING },
+    detectedObjects: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+    extractedAddress: { type: SchemaType.STRING },
+    recommendedActions: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
   },
   required: ['summary', 'severity', 'confidence', 'hazards', 'sceneSummary', 'timeline'],
-};
+} satisfies ResponseSchema;
 
 export async function POST(request: Request) {
   try {
