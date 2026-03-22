@@ -363,7 +363,7 @@ export default function Dashboard() {
 
   // Model tier state
   const [modelTier, setModelTier] = useState<"flash" | "pro" | "pro3">("flash");
-  const [photoModel, setPhotoModel] = useState<"flash" | "nano-banana">("flash");
+  const [photoModel, setPhotoModel] = useState<"flash">("flash");
 
   // Chat image upload state
   const [chatFiles, setChatFiles] = useState<File[]>([]);
@@ -487,9 +487,18 @@ export default function Dashboard() {
   };
 
   const handleAnalyzeSubmit = async () => {
-    if (uploadedFiles.length === 0) return;
-    if (!createMode && !selectedIncidentId) return;
-    if (createMode && !newTitle.trim()) return;
+    if (uploadedFiles.length === 0) {
+      setAnalysisError("Please upload at least one image.");
+      return;
+    }
+    if (createMode && !newTitle.trim()) {
+      setAnalysisError("Please enter a title for the new incident.");
+      return;
+    }
+    if (!createMode && !selectedIncidentId) {
+      setAnalysisError("Please select an incident to attach to.");
+      return;
+    }
 
     setAnalyzing(true);
     setAnalysisError(null);
@@ -1707,23 +1716,10 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      {([
-                        { key: "flash" as const, label: "Gemini Flash", desc: "Standard analysis" },
-                        { key: "nano-banana" as const, label: "Nano Banana 2", desc: "Advanced image AI" },
-                      ]).map((m) => (
-                        <button
-                          key={m.key}
-                          onClick={() => setPhotoModel(m.key)}
-                          className={`flex-1 flex flex-col items-center gap-1 px-3 py-3 rounded-lg text-xs font-semibold transition-colors ${
-                            photoModel === m.key
-                              ? "bg-tertiary/15 text-tertiary"
-                              : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-bright"
-                          }`}
-                        >
-                          <span>{m.label}</span>
-                          <span className="text-[9px] font-normal opacity-70">{m.desc}</span>
-                        </button>
-                      ))}
+                      <div className="flex-1 flex flex-col items-center gap-1 px-3 py-3 rounded-lg text-xs font-semibold bg-tertiary/15 text-tertiary">
+                        <span>Gemini 2.5 Flash</span>
+                        <span className="text-[9px] font-normal opacity-70">Multimodal analysis</span>
+                      </div>
                     </div>
                   </div>
 
