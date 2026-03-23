@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+
+const VoiceConversation = lazy(() => import("@/app/components/VoiceConversation"));
 
 export default function ChatPage() {
   const [modelTier, setModelTier] = useState<"flash" | "pro" | "pro3">("flash");
   const [chatInput, setChatInput] = useState("");
   const [chatFiles, setChatFiles] = useState<File[]>([]);
+  const [voiceMode, setVoiceMode] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -190,28 +193,76 @@ export default function ChatPage() {
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            <select
-              value={modelTier}
-              onChange={(e) => setModelTier(e.target.value as "flash" | "pro" | "pro3")}
-              className="bg-surface-container-lowest border border-outline-variant/15 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-on-surface-variant outline-none appearance-none cursor-pointer hover:border-outline-variant/30 transition-colors"
-            >
-              <option value="flash">Flash</option>
-              <option value="pro">Pro</option>
-              <option value="pro3">3.1 Pro</option>
-            </select>
+            {/* Text / Voice mode toggle */}
+            <div className="flex items-center bg-surface-container-lowest border border-outline-variant/15 rounded-lg p-0.5">
+              <button
+                onClick={() => setVoiceMode(false)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors ${
+                  !voiceMode
+                    ? "bg-tertiary/15 text-tertiary"
+                    : "text-on-surface-variant hover:text-on-surface"
+                }`}
+                aria-label="Text mode"
+              >
+                <span className="material-symbols-outlined text-[14px]">forum</span>
+                Text
+              </button>
+              <button
+                onClick={() => setVoiceMode(true)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors ${
+                  voiceMode
+                    ? "bg-tertiary/15 text-tertiary"
+                    : "text-on-surface-variant hover:text-on-surface"
+                }`}
+                aria-label="Voice mode"
+              >
+                <span className="material-symbols-outlined text-[14px]">mic</span>
+                Voice
+              </button>
+            </div>
+
+            {!voiceMode && (
+              <select
+                value={modelTier}
+                onChange={(e) => setModelTier(e.target.value as "flash" | "pro" | "pro3")}
+                className="bg-surface-container-lowest border border-outline-variant/15 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-on-surface-variant outline-none appearance-none cursor-pointer hover:border-outline-variant/30 transition-colors"
+              >
+                <option value="flash">Flash</option>
+                <option value="pro">Pro</option>
+                <option value="pro3">3.1 Pro</option>
+              </select>
+            )}
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
-              status === "streaming" ? "bg-tertiary/10 text-tertiary" : status === "submitted" ? "bg-warning/10 text-warning" : "bg-surface-container-highest text-on-surface-variant"
+              voiceMode
+                ? "bg-tertiary/10 text-tertiary"
+                : status === "streaming" ? "bg-tertiary/10 text-tertiary" : status === "submitted" ? "bg-warning/10 text-warning" : "bg-surface-container-highest text-on-surface-variant"
             }`}>
               <span className={`w-1.5 h-1.5 rounded-full ${
-                status === "streaming" ? "bg-tertiary animate-pulse" : status === "submitted" ? "bg-warning animate-pulse" : "bg-on-surface-variant/50"
+                voiceMode
+                  ? "bg-tertiary"
+                  : status === "streaming" ? "bg-tertiary animate-pulse" : status === "submitted" ? "bg-warning animate-pulse" : "bg-on-surface-variant/50"
               }`} />
-              {status === "submitted" ? "Connecting" : status === "streaming" ? "Streaming" : "Ready"}
+              {voiceMode ? "Voice" : status === "submitted" ? "Connecting" : status === "streaming" ? "Streaming" : "Ready"}
             </span>
           </div>
         </header>
 
         {/* Chat area */}
         <div className="flex-1 flex flex-col pt-14">
+
+          {/* Voice mode */}
+          {voiceMode && (
+            <Suspense fallback={
+              <div className="flex-1 flex items-center justify-center">
+                <span className="text-on-surface-variant text-sm">Loading voice mode...</span>
+              </div>
+            }>
+              <VoiceConversation onClose={() => setVoiceMode(false)} />
+            </Suspense>
+          )}
+
+          {/* Text chat mode */}
+          {!voiceMode && <>
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-4 md:px-8 lg:px-16 xl:px-32 py-6 space-y-5 scrollbar-thin">
             {messages.length === 0 && (
@@ -417,6 +468,7 @@ export default function ChatPage() {
               <span className="material-symbols-outlined text-[20px]">send</span>
             </button>
           </form>
+          </>}
         </div>
       </div>
     </div>
