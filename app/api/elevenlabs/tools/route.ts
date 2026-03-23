@@ -55,8 +55,6 @@ export async function POST(req: Request) {
           title: p.title,
           desc: p.description,
           source: p.source ?? 'Voice Report',
-          credibility: 75,
-          credibilityColor: 'bg-tertiary',
           time: 'just now',
           icon: 'mic',
         });
