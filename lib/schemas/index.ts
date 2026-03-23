@@ -91,7 +91,7 @@ export const IncidentStatusSchema = z.enum([
 ]);
 export type IncidentStatus = z.infer<typeof IncidentStatusSchema>;
 
-export const IncidentSourceSchema = z.enum(['field', 'social', 'camera', 'integration', 'xbot']);
+export const IncidentSourceSchema = z.enum(['field', 'social', 'camera', 'integration', 'xbot', 'voice']);
 export type IncidentSource = z.infer<typeof IncidentSourceSchema>;
 
 export const IncidentSchema = z.object({
